@@ -1,0 +1,7 @@
+Django==1.9.13
+requests==2.17.3
+sanic==0.6.0
+pytest-asyncio==0.8.0
+asynctest
+-e git+https://rossrochford@bitbucket.org/eventjumbler/hypersh_client.git#egg=hypersh_client
+aiohttp
