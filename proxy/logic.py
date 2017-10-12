@@ -337,8 +337,10 @@ class AppLogic(object):
                 success, sessions = await self.get_active_sessions(container)  # todo: does this query take long?
                 if success:
                     active_sessions[container] = sessions
+                else:
+                    active_sessions[container] = []  # container may be down, should we ping and call notify_container_down()? surely refresh() would normally catch this?
 
-            if leftover_id in active_sessions[container]:
+            if leftover_id in active_sessions[container]:  # todo: adjust selenium grid's timeout to not drop idle sessions too quickly
                 return leftover_id
             # otherwise leftover_id will get discarded
 

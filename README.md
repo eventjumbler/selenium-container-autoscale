@@ -13,10 +13,9 @@ your containers when you're finished. It also has no unit tests and may be prone
 
 ### Prerequisites
 
-docker:        https://docs.docker.com/engine/installation/
-
 hyper.sh cli:  https://console.hyper.sh/cli/download  (you will need to sign up)
 
+docker:        https://docs.docker.com/engine/installation/  (if you wish to modify and build this project)
 
 ### Setup
 
@@ -28,49 +27,38 @@ Set environment variables and run hyper config:
 ```
 export HYPERSH_ACCESS_KEY=<your_access_key>
 export HYPERSH_SECRET=<your_secret_key>
-
 hyper config --accesskey $HYPERSH_ACCESS_KEY --secretkey $HYPERSH_SECRET --default-region eu-central-1    # or: us-west-1
 ```
 
-#### Build, deploy and run container image
+#### Running
 
-Create a new Docker Repository at: https://hub.docker.com
+Running the service is easy. 1) Pull the docker images 2) create a public IP address and 3) run the proxy container and attach the IP address
 
-To build the container and push to your docker repository do:
-
+1) Pull the images for the proxy and selenium nodes into your hyper.sh account:
 ```
-https://github.com/eventjumbler/selenium-container-autoscale.git
-cd selenium-container-autoscale
-./build_docker.sh <repo_path>       # <repo_path> will be something like: myaccount/myrepo
+hyper pull digiology/serviceproxy_sanic_async
+hyper pull digiology/selenium_node
 ```
 
-Pull the image into hyper.sh
-
-```
-hyper pull <repo_path>
-```
-
-Create a public IP address (note: hyper.sh charges $1/month per address). We need an IP for the proxy if we're running out tests/clients outside of hyper.sh's network.
-
+2) Create a public IP address (note: hyper.sh charges $1/month per address). We need an IP for the proxy if we're running out tests/clients outside of hyper.sh's network.
 ```
 hyper fip allocate 1
 hyper fip ls   # returns your new IP
 ```
 
-Run a container and attach the IP address
-
+3) Run the proxy container and attach the IP address
 ```
 hyper run -p 5000:5000 -d --name seleniumproxy <repo_path>   # TODO: check that main/main.py is actually launched
 hyper fip attach <ip_address> seleniumproxy
 ```
 
-## Test that seleniumproxy is running
+## Testing that it's running
 
 ```
 hyper ps
 
 CONTAINER ID        IMAGE                                COMMAND             CREATED             STATUS              PORTS                    NAMES                    PUBLIC IP
-c268a11ea31f        <repo_path>                          "/bin/bash"         3 minutes ago       Up 3 minutes        0.0.0.0:5000->5000/tcp   seleniumproxy            <ip_address>
+c268a11ea31f        digiology/serviceproxy_sanic_async   "/bin/bash"         3 minutes ago       Up 3 minutes        0.0.0.0:5000->5000/tcp   seleniumproxy            <ip_address>
 
 
 curl http://<ip_address>:5000/test/
@@ -78,7 +66,7 @@ curl http://<ip_address>:5000/test/
 success!
 ```
 
-## Create a selenium browser instance
+## Creating a selenium browser instance
 
 In python you would do:
 
@@ -97,13 +85,23 @@ Now we will be able to see that hyper.sh has launched a new container:
 hyper ps
 
 CONTAINER ID        IMAGE                                COMMAND             CREATED             STATUS              PORTS                    NAMES                    PUBLIC IP
-c268a11ea31f        <repo_path>                          "/bin/bash"         3 minutes ago       Up 3 minutes        0.0.0.0:5000->5000/tcp   seleniumproxy            <ip_address>
+c268a11ea31f        digiology/serviceproxy_sanic_async   "/bin/bash"         3 minutes ago       Up 3 minutes        0.0.0.0:5000->5000/tcp   seleniumproxy            <ip_address>
 530a67042f52        digiology/selenium_node              "/bin/bash"         2 minutes ago       Up 2 minutes        0.0.0.0:5000->5000/tcp   seleniumnode33shj34j3a
 ```
 
-Note: the system is configured to run up to 3 Firefox instances per "M2" (dual-core, 2GB RAM) container.
+Note: the system is configured to run up to 3 Firefox instances per "M2" (dual-core, 2GB RAM) container so creating another Remote driver won't spin up another container.
 
-### Shutting down containers
+When a driver is quit, the proxy will keep it for later reuse:
+```
+>>> driver.session_id
+'0eded26f-06af-af4f-84b2-13b689385499'
+>>> driver.quit()
+>>> driver = Remote('http://<ip_address>:5000/wd/hub', desired_capabilities=capabilities)  # notice how quickly this returns!
+>>> driver.session_id
+'0eded26f-06af-af4f-84b2-13b689385499'   # same as above
+```
+
+### Shutting it all down
 
 This will shutdown all the selenium containers but keep the main proxy service running on the public IP address
 ```
@@ -114,6 +112,22 @@ Or to remove ALL of your containers completely do:
 ```
 hyper rm -f `hyper ps -aq`
 ```
+
+#### Building and deploying your own proxy server
+
+Create a new Docker Repository at: https://hub.docker.com
+
+Build the container and push to your docker repository:
+```
+./build_docker.sh <repo_path>       # <repo_path> will be something like: myaccount/myrepo
+```
+
+Pull the image into hyper.sh
+```
+hyper pull <repo_path>
+hyper pull digiology/selenium_node
+```
+
 
 ## Known Issues
 
