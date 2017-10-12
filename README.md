@@ -1,10 +1,10 @@
 # Selenium Container Autoscale
 
-This project provides an easy way to set up a autoscaling container-hosted selenium service. It works by proxying selenium's http (JSONWire)
+This project provides an easy way to set up an autoscaling container-hosted selenium service. It works by proxying selenium's http (JSONWire)
 requests to containers that run browser instances, spinning up new containers dynamically, reusing browsers instances that have been
 released and shutting down idle containers.
 
-It currently only works with Firefox hosted on docker containers on hyper.sh but may expand to other browsers and container hosts in future.
+It currently only works with Firefox hosted on hyper.sh containers but may expand to other browsers and container hosts in future.
 
 This is a work in progress and so should be used with some caution. In particular, auto-shutdown has not yet been implemented so be sure to shut down
 your containers when you're finished. It also has no unit tests and may be prone to race conditions when under heavy use (e.g. > 100 concurrent instances).
@@ -34,7 +34,7 @@ hyper config --accesskey $HYPERSH_ACCESS_KEY --secretkey $HYPERSH_SECRET --defau
 
 #### Build, deploy and run container image
 
-Create a Docker Repository at: https://hub.docker.com
+Create a new Docker Repository at: https://hub.docker.com
 
 To build the container and push to your docker repository do:
 
@@ -135,6 +135,8 @@ it seems to require a bit of hacking (e.g. subclassing the Remote and RemoteConn
 containers before they are required.
 
 * It doesn't fail gracefully when you exceed your hyper.sh container quota. This is max 10 containers by default, to increase this you can contact them.
+
+* Each selenium node runs selenium grid's hub, which is unnecessary. It's simply how I initially got it running during development and haven't changed it yet. I'm guessing the hub can run on the proxy server.
 
 ## Contributing
 
