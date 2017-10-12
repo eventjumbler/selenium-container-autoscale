@@ -14,6 +14,7 @@ your containers when you're finished. It also has no unit tests and may be prone
 ### Prerequisites
 
 docker:        https://docs.docker.com/engine/installation/
+
 hyper.sh cli:  https://console.hyper.sh/cli/download  (you will need to sign up)
 
 
@@ -49,8 +50,7 @@ Pull the image into hyper.sh
 hyper pull <repo_path>
 ```
 
-Create a public IP address (note: hyper.sh charges $1/month per address).
-We need an IP for the proxy if we're running out tests/clients outside of hyper.sh's network.
+Create a public IP address (note: hyper.sh charges $1/month per address). We need an IP for the proxy if we're running out tests/clients outside of hyper.sh's network.
 
 ```
 hyper fip allocate 1
