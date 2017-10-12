@@ -113,7 +113,7 @@ Or to remove ALL of your containers completely do:
 hyper rm -f `hyper ps -aq`
 ```
 
-#### Building and deploying your own proxy server
+### Building and deploying your own proxy server
 
 Create a new Docker Repository at: https://hub.docker.com
 
