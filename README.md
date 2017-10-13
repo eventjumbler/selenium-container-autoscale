@@ -15,7 +15,7 @@ your containers when you're finished. It also has no unit tests and may be prone
 
 hyper.sh cli:  https://console.hyper.sh/cli/download  (you will need to sign up)
 
-docker:        https://docs.docker.com/engine/installation/  (if you wish to modify and build this project)
+docker:        https://docs.docker.com/engine/installation/  if you wish to modify and build this project
 
 ### Setup
 
@@ -115,7 +115,7 @@ hyper rm -f `hyper ps -aq`
 
 ### Building and deploying your own proxy server
 
-Create a new Docker Repository at: https://hub.docker.com
+Create a new public Docker repository at: https://hub.docker.com
 
 Build the container and push to your docker repository:
 ```

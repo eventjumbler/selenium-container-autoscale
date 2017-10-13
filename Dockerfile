@@ -28,4 +28,4 @@ ADD ./proxy /proxy
 #CMD ["/usr/local/bin/supervisord"]
 #CMD ["supervisord", "-c", "/etc/supervisor.conf"]  # todo: this isn't working
 
-CMD ["python3" "/main/main.py"]
+ENTRYPOINT ["python3", "/main/main.py"]
