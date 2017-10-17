@@ -25,9 +25,7 @@ Go to https://console.hyper.sh/account/credential and click 'Create credential' 
 
 Set environment variables and run hyper config:
 ```
-export HYPERSH_ACCESS_KEY=<your_access_key>
-export HYPERSH_SECRET=<your_secret_key>
-export HYPERSH_REGION=eu-central-1  # or us-west-1
+
 
 hyper config --accesskey $HYPERSH_ACCESS_KEY --secretkey $HYPERSH_SECRET --default-region $HYPERSH_REGION
 ```
@@ -50,7 +48,7 @@ hyper fip ls   # returns your new IP
 
 3) Run the proxy container and attach the IP address
 ```
-hyper run -p 5000:5000 -d --name seleniumproxy <repo_path>
+hyper run -p 5000:5000 -d --name seleniumproxy eventjumbler/selenium-proxy
 hyper fip attach <ip_address> seleniumproxy
 ```
 
@@ -117,7 +115,14 @@ hyper rm -f `hyper ps -aq`
 
 ### Building and deploying your own proxy server
 
-Create a new public Docker repository at: https://hub.docker.com
+First, create a new public Docker repository at: https://hub.docker.com
+
+Set the following environment variables
+```
+export HYPERSH_ACCESS_KEY=<your_access_key>
+export HYPERSH_SECRET=<your_secret_key>
+export HYPERSH_REGION=eu-central-1  # or us-west-1
+```
 
 Build the container and push to your docker repository:
 ```
@@ -150,9 +155,11 @@ the container and launch a new browser instance (about 40-50 seconds). It's poss
 it seems to require a bit of hacking (e.g. subclassing the Remote and RemoteConnection classes). A possible solution would be to prelaunch
 containers before they are required.
 
-* It doesn't fail gracefully when you exceed your hyper.sh container quota. This is max 10 containers by default, to increase this you can contact them.
+* It doesn't fail gracefully when you exceed your hyper.sh container quota. This is max 10 containers by default, to increase this you need to request a quota increase with them.
 
 * Each selenium node runs selenium grid's hub, which is unnecessary. It's simply how I initially got it running during development and haven't changed it yet. I'm guessing the hub can run on the proxy server.
+
+# No documentation for building your own version of: https://github.com/eventjumbler/selenium-container-node  (though it shouldn't be too hard: clone repo, run build_docker.sh, set the SELENIUM_NODE_IMAGE environment variable and rebuild the image for the proxy server)
 
 ## Contributing
 
