@@ -14,14 +14,17 @@ RUN mv /hyper /usr/bin/hyper
 
 ARG HYPERSH_ACCESS_KEY
 ARG HYPERSH_SECRET
+ARG HYPERSH_REGION
 ENV HYPERSH_ACCESS_KEY ${HYPERSH_ACCESS_KEY}
 ENV HYPERSH_SECRET ${HYPERSH_SECRET}
-RUN hyper config --accesskey $HYPERSH_ACCESS_KEY --secretkey $HYPERSH_SECRET --default-region eu-central-1
+ENV HYPERSH_REGION ${HYPERSH_REGION}
+RUN hyper config --accesskey $HYPERSH_ACCESS_KEY --secretkey $HYPERSH_SECRET --default-region $HYPERSH_REGION
 
 RUN mkdir -p /var/log/supervisor
 RUN mkdir -p /etc/supervisor/conf.d
 ADD ./supervisor.conf /etc/supervisor.conf
 
+ENV PYTHONPATH /
 ADD ./main /main
 ADD ./proxy /proxy
 

@@ -5,9 +5,13 @@ import time
 import traceback
 import sys
 import aiohttp
+from selenium.webdriver import DesiredCapabilities
 
 
 SIMULATION_MODE = False
+
+
+CAPABILITIES = DesiredCapabilities().FIREFOX
 
 
 async def get_running_containers_async(loop, image=None):

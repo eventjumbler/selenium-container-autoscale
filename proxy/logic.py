@@ -1,20 +1,19 @@
 import json
 import datetime
-import subprocess
 from uuid import uuid4
-import time
 from requests.exceptions import ConnectionError
 import requests
-from proxy.util import get_running_containers_async, exception_info, http_get, http_post
-from proxy.driver_requests import get_page, get_page_async
 import asyncio
 from asyncio.subprocess import PIPE
 import aiohttp
 from hypersh_client.main.hypersh2 import HypershClient
 from subprocess import Popen, PIPE
+import os
 
+from proxy.driver_requests import get_page_async, NEW_SESSION_REQ_BODY
 
-CAPABILITIES = '{"capabilities": {"firstMatch": [{}], "alwaysMatch": {"browserName": "firefox"}}, "desiredCapabilities": {"javascriptEnabled": true, "marionette": true, "platform": "ANY", "browserName": "firefox", "version": ""}}'
+NEW_SESSION_REQ_BODY_STR = json.dumps(NEW_SESSION_REQ_BODY)
+
 
 PORT = '5555'
 MAX_DRIVERS_PER_CONTAINER = 3
@@ -38,18 +37,6 @@ def uuid(len):
     return uuid4().hex[:len]
 
 
-'''
-        session = aiohttp.ClientSession()
-        url = base_url(container_name) + '/wd/hub/session'
-        print('launching driver on: '+ base_url(container_name))
-        try:
-            resp = session.post(url, data=CAPABILITIES)
-            await resp.read()  # wait for response
-        except:
-            return False, None, None
-'''
-
-
 class AppLogic(object):
 
     def __init__(self, asyncio_loop, proxy_container_id):
@@ -57,7 +44,7 @@ class AppLogic(object):
         self.leftover_drivers = []
         self.drivers = {}
         self.proxy_container = proxy_container_id
-        self.hyper_client = HypershClient()
+        self.hyper_client = HypershClient(os.environ.get('HYPERSH_REGION'))
         self.running_containers_cache = None
         self.running_containers_last_checked = datetime.datetime.now() - datetime.timedelta(minutes=60)
 
@@ -72,7 +59,7 @@ class AppLogic(object):
             driver_counts[container] = MAX_DRIVERS_PER_CONTAINER - count
         return driver_counts
 
-    async def launch_driver(self, reuse_session=None):
+    async def launch_driver(self, req_body, reuse_session=None):
         """
         Launch a selenium driver. If a specific 'reuse_session' is specified
         attempt to reuse it, otherwise attempt to find another 'leftover'
@@ -82,7 +69,7 @@ class AppLogic(object):
         if reuse_session:
             if reuse_session in self.leftover_drivers:
                 self._create_from_leftover(reuse_session)
-                return True, self.drivers[reuse_session]
+                return True, False, self.drivers[reuse_session]
                 # else, ignore and continue as normal
             else:
                 if reuse_session in self.drivers:
@@ -99,12 +86,12 @@ class AppLogic(object):
         if leftover_id:
             success = self._create_from_leftover(leftover_id)  # doesn't block
             if success:
-                return True, self.drivers[leftover_id]
+                return True, False, self.drivers[leftover_id]
 
-        success, selenium_id = await self._create_new()  # always blocks
+        success, selenium_id = await self._create_new(req_body)  # always blocks
         if not success:
-            return False, None
-        return True, self.drivers[selenium_id]
+            return False, False, None
+        return True, False, self.drivers[selenium_id]
 
     async def quit_driver(self, selenium_id):
         success = False
@@ -138,22 +125,22 @@ class AppLogic(object):
             return max(command_times)  # will be same for all drivers in a container
         self.leftover_drivers.sort(key=order_leftovers, reverse=True)
 
-    async def _launch_driver_on_container(self, container_name):
-        #req_session = requests.Session()
-        session = aiohttp.ClientSession()
+    async def _launch_driver_on_container(self, req_body, container_name):
+        req_session = requests.Session()
+        #session = aiohttp.ClientSession(loop=self.loop)
         url = base_url(container_name) + '/wd/hub/session'
         print('launching driver on: '+ base_url(container_name))
 
-        try:
-            status_code, resp_json = await http_post(url, data=CAPABILITIES)  # todo: add KeepAlive parameter
-        except:
+        resp = await self.loop.run_in_executor(None, req_session.post, url, req_body)
+
+        print('finished driver launch attempt, status: %s' % resp.status_code)
+
+        if resp.status_code != 200:
             return False, None, None
 
-        print('finished driver launch attempt, status: %s' % status_code)
-        if status_code != 200:
-            return False, None, None
-        session_id = resp_json['sessionId']
-        return True, session, session_id
+        resp_json = json.loads(resp.content.decode())
+
+        return True, req_session, resp_json
 
     async def _wait_for_container_ready(self, container_name):
         """
@@ -164,7 +151,9 @@ class AppLogic(object):
         if success is False:
             print('warning: container took > 20s to launch')
 
-        for i in range(20):
+        await asyncio.sleep(3)  # usually needs another 5-6 seconds but start polling for sessions a little earlier
+
+        for i in range(10):
             try:
                 success, status, sessions = await self._get_active_sessions(container_name)
                 if success:
@@ -173,9 +162,9 @@ class AppLogic(object):
             except Exception as e:
                 print('exception from _get_active_sessions() %s' % e)
 
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.6)
 
-        if i == 19:
+        if i == 14:
             print(
                 'warning: container not ready /wd/hub/sessions '
                 'failed to load in time, continuing anyway'
@@ -186,9 +175,11 @@ class AppLogic(object):
         container_name = 'seleniumnode' + uuid(10)
         print('launching container: ' + container_name)
 
+        image = os.environ.get('SELENIUM_NODE_IMAGE', 'eventjumbler/selenium-node')
         success, container_id = self.hyper_client.create_container(
-            'digiology/selenium_node', name=container_name, size='M2',
-            environment_variables={'PROXY_CONTAINER': self.proxy_container}
+            image, name=container_name, size='M2',
+            environment_variables={'PROXY_CONTAINER': self.proxy_container},
+            tcp_ports=['4444', '5555']
         )
         if not success:
             print('error: problem when launching container')
@@ -269,11 +260,13 @@ class AppLogic(object):
         #resp = await session.get(base_url(container) + '/wd/hub/sessions')
         # old: resp = requests.get(base_url(container) + '/wd/hub/sessions')  # don't catch this exception
 
-        status, resp_json = await http_get(base_url(container) + '/wd/hub/sessions')
-        if status != 200:
-            print('GET /wd/hub/sessions status: %s  %s' % (status, resp_json))
-            return False, status, []
-        # old: resp_json = json.loads(resp.content.decode())
+        resp = await self.loop.run_in_executor(None, requests.get, base_url(container) + '/wd/hub/sessions')
+
+        if resp.status_code != 200:
+            print('GET /wd/hub/sessions status: %s  %s' % (resp.status_code , resp.content.decode()))
+            return False, resp.status_code, []
+
+        resp_json = json.loads(resp.content.decode())
         #resp_json = await resp.json()
         active_sessions = [di['id'] for di in resp_json['value']]
         end = datetime.datetime.now()
@@ -346,30 +339,33 @@ class AppLogic(object):
 
         return None
 
-    async def _create_new(self, retry_on_fail=True):
+    async def _create_new(self, req_body, retry_on_fail=True):
         success, created, container_name = await self.get_or_create_container()
         if success is False:
-
             raise Exception('failed to create new container')
         if created:
             success = await self._wait_for_container_ready(container_name)
             if success is False:
                 if retry_on_fail:  # retry once
-                    return await self._create_new(retry_on_fail=False)
+                    return await self._create_new(req_body, retry_on_fail=False)
                 else:
                     return False, None
 
-        success, req_session, selenium_session_id = await self._launch_driver_on_container(container_name)
+        success, req_session, resp_json = await self._launch_driver_on_container(req_body, container_name)
+
+        selenium_session_id = resp_json['value']['sessionId']
 
         if success is False:
             return False, None
 
         self.drivers[selenium_session_id] = {
-            'aiohttp_session': req_session,
+            'requests_session': req_session,
+            #'aiohttp_session': req_session,
             'selenium_session_id': selenium_session_id,
             'state': 'DRIVER_STARTED',
             'container': container_name,
             'last_command_time': datetime.datetime.now(),
+            'creation_resp_json': resp_json
         }
 
         return True, selenium_session_id
@@ -395,8 +391,9 @@ async def sys_call_async(command):
 
 def sys_call(cmd_str, shell=False, suppress_errors=True):
     p = Popen(cmd_str.split(), stdout=PIPE, stderr=PIPE, stdin=PIPE, shell=shell) #stderr=PIPE,
-    p.communicate()
+    #p.communicate()
     stdout, stderr = p.stdout.read(), p.stderr.read()
+    p.wait()
     success = p.returncode == 0
     return success, stdout, stderr
 

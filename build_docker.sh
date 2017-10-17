@@ -1,8 +1,13 @@
-
 if [ "$#" -ne 1 ]; then
     echo "invalid arguments"
     echo "usage: build_docker.sh <image_repo>"
     exit 1
+fi
+
+if [ -z "$HYPERSH_ACCESS_KEY" ] || [ -z "$HYPERSH_SECRET" ] || [ -z "$HYPERSH_REGION" ]
+then
+      echo "Environment variables missing. HYPERSH_ACCESS_KEY, HYPERSH_SECRET, and HYPERSH_REGION all need to be set"
+      exit 1
 fi
 
 REPO_PATH=$1
@@ -11,9 +16,13 @@ REPO_PATH=$1
 IFS='/' read -a myarray <<< "$REPO_PATH"
 REPO_NAME="${myarray[1]}"
 
+echo 'building image'
+BUILD_STDOUT=$(docker build -t $REPO_NAME:latest --build-arg HYPERSH_ACCESS_KEY=$HYPERSH_ACCESS_KEY --build-arg HYPERSH_SECRET=$HYPERSH_SECRET --build-arg HYPERSH_REGION=$HYPERSH_REGION .)
+echo 'finished building image'
 
-BUILD_STDOUT=$(docker build -t $REPO_NAME:latest --build-arg HYPERSH_ACCESS_KEY=$HYPERSH_ACCESS_KEY --build-arg HYPERSH_SECRET=$HYPERSH_SECRET .)
-CONTAINER_ID=${BUILD_STDOUT: -12}
-docker commit $CONTAINER_ID serviceproxy_sanic
-docker tag serviceproxy_sanic $REPO_PATH
+IMAGE_ID=${BUILD_STDOUT: -12}
+CONTAINER_ID=$(docker create $IMAGE_ID)
+docker commit $CONTAINER_ID $REPO_NAME
+docker tag $REPO_NAME $REPO_PATH
+echo 'pushing to docker repo'
 docker push $REPO_PATH

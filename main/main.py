@@ -2,7 +2,7 @@ import re
 import asyncio
 from signal import signal, SIGINT
 from uuid import uuid4
-
+import aiohttp
 from sanic import Sanic
 from sanic.exceptions import SanicException
 from sanic.response import json as json_resp
@@ -23,10 +23,21 @@ SESSION_ID_REGEXP = r'/(?P<selenium_id>\w{8}-\w{4}-\w{4}-\w{4}-\w{12})'
 #HYPER_FIP = '199.245.57.93'
 
 sanic_app = Sanic(__name__)
+sanic_app.config.REQUEST_TIMEOUT = 90  # default is 60
 
 
 def uuid(len):
     return uuid4().hex[:len]
+
+
+def do_selenium_request(request, sess, url):
+    if request.method == 'POST':
+        resp = sess.post(url, data=request.body)
+    elif request.method == 'GET':
+        resp = sess.get(url, params=dict(request.args))
+    elif request.method == 'DELETE':
+        resp = sess.delete(url)
+    return resp
 
 
 def driver_request_type(driver_url, method):
@@ -90,6 +101,9 @@ def get_session_id(driver_url, body_str):
 @sanic_app.route('/driver/<driver_url:path>', methods=['GET', 'POST', 'DELETE'])
 async def query_driver(request, driver_url):
 
+    if '//' in driver_url:
+        driver_url = driver_url.replace('//', '/')
+
     request_type = driver_request_type(driver_url, request.method)
     body_str = request.body.decode()
 
@@ -103,7 +117,7 @@ async def query_driver(request, driver_url):
         reuse_session = json.loads(body_str).get('reuse_session')  # often None
 
         start = datetime.datetime.now()
-        success, driver_dict = await app_logic.launch_driver(reuse_session or None)
+        success, new_created, driver_dict = await app_logic.launch_driver(body_str, reuse_session or None)
         # success, driver_dict = await loop.run_in_executor(   # or: await asyncio.wait_for(future, timeout, loop=loop)
         #     None, app_logic.launch_driver, (reuse_session or None)
         # )
@@ -111,9 +125,9 @@ async def query_driver(request, driver_url):
         print('launch_driver took: %s ' % (end-start))
 
         if success:
-            return new_driver_resp(driver_dict['selenium_session_id'])
+            return json_resp(driver_dict['creation_resp_json'], 200)
 
-        raise SanicException('Container launch failed', 500)
+        raise SanicException('driver launch failed', 500)
 
     # elif request_type == GET_COMMAND:
     #     pass
@@ -135,7 +149,7 @@ async def query_driver(request, driver_url):
 
     container_name = app_logic.drivers[selenium_id]['container']
     url = 'http://' + container_name + ':5555/' + driver_url
-    sess = app_logic.drivers[selenium_id]['aiohttp_session']
+    sess = app_logic.drivers[selenium_id]['requests_session']
 
     # resp = await loop.run_in_executor(
     #     None, do_selenium_request, (request, sess, url)
@@ -154,32 +168,69 @@ async def query_driver(request, driver_url):
     # need an asyn version of requests.get()  (possibility: https://stackoverflow.com/questions/22190403/how-could-i-use-requests-in-asyncio and client example here: https://aiohttp.readthedocs.io/en/stable/)
     # todo: I think this is what it needs: https://aiohttp.readthedocs.io/en/stable/client_reference.html
 
-    #return text_resp(resp.content.decode(), 200)
+    resp = await loop.run_in_executor(None, do_selenium_request, request, sess, url)
+    if resp.status_code != 200:
+        print('warning: selenium request gave status: %s' % resp.status_code)
 
-    resp = await do_selenium_request(request, sess, url)
+    return HTTPResponse(resp.content.decode(), status=resp.status_code, content_type="application/json")
+
+    #resp = await do_selenium_request(request, sess, url)
     #return json_resp(await resp.read())
-    return HTTPResponse((await resp.read()).decode(), status=200, content_type="application/json")
+    #return HTTPResponse((await resp.read()).decode(), status=200, content_type="application/json")
 
 
-async def do_selenium_request(request, sess, url):  # todo: what about http headers?
-    if request.method == 'GET':
-        resp = await sess.get(url,  params=dict(request.args))
-    elif request.method == 'POST':
-        resp = await sess.post(url, data=request.body)
-    elif request.method == 'DELETE':
-        resp = await sess.delete(url)
-    return resp
-
-
-# old ver:
-# async def do_selenium_request(request, sess, url):
-#     if request.method == 'POST':
-#         resp = sess.post(url, data=request.body)
-#     elif request.method == 'GET':
-#         resp = sess.get(url, params=dict(request.args))
+# async def do_selenium_request_old(request, sess, url):  # todo: what about http headers?
+#     if request.method == 'GET':
+#         #resp = await sess.get(url,  params=dict(request.args))
+#
+#         async with aiohttp.get(url, params=dict(request.args)) as resp:
+#             if resp.status == 200:
+#                 return await resp
+#
+#     elif request.method == 'POST':
+#         #resp = await sess.post(url, data=request.body)
+#
+#         async with aiohttp.post(url, data=request.body) as resp:
+#             if resp.status == 200:
+#                 return await resp
+#
 #     elif request.method == 'DELETE':
-#         resp = sess.delete(url)
+#         #resp = await sess.delete(url)
+#
+#         async with aiohttp.delete(url) as resp:
+#             if resp.status == 200:
+#                 return await resp
+#
 #     return resp
+#
+#
+# async def do_selenium_request(request, sess, url, ):
+#     resp = None
+#     if request.method == 'GET':
+#         async with aiohttp.ClientSession(loop=loop) as client:
+#             async with client.get(url, params=dict(request.args)) as resp:
+#                 return resp
+#     elif request.method == 'POST':
+#         async with aiohttp.ClientSession(loop=loop) as client:
+#             async with client.post(url, data=request.body) as resp:
+#                 return resp
+#     elif request.method == 'DELETE':
+#         async with aiohttp.ClientSession(loop=loop) as client:
+#             async with client.delete(url) as resp:
+#                 return resp
+#
+#     status = resp.status if resp else None
+#     raise SanicException('problem in do_selenium_request(): %s %s' % (request.method, status))
+
+
+'''
+15:28:49.911 INFO - Handler thread for session 73f76d24-7085-4078-968c-2e6749211cc8 (firefox): Executing POST on /session/73f76d24-7085-4078-968c-2e6749211cc8/url (handler: ServicedSession)
+15:28:49.919 INFO - To upstream: {"url": "http://soas.ac.uk", "sessionId": "73f76d24-7085-4078-968c-2e6749211cc8"}
+
+15:29:02.195 INFO - Handler thread for session 73f76d24-7085-4078-968c-2e6749211cc8 (firefox): Executing POST on /session/73f76d24-7085-4078-968c-2e6749211cc8/elements (handler: ServicedSession)
+15:29:02.203 INFO - To upstream: {"value": "//a", "using": "xpath", "sessionId": "73f76d24-7085-4078-968c-2e6749211cc8"}
+'''
+
 
 from proxy.logic import sys_call
 
@@ -197,11 +248,11 @@ if __name__ == '__main__':
     loop = asyncio.get_event_loop()
 
     succ, container_id, err = sys_call('hostname')
-    if succ is False:
-        exit('failed to get container_id')
-    if not container_id.strip():
+    if succ is False :
+        print('failed to get container_id')
+    if succ is False or not container_id.strip():
         container_id = uuid(10)
-        print('warning: container_id is blank (are you running outside a container?), generating false id: %s' % container_id)
+        print('warning: no container_id found, (are you running outside a container?), generating false id: %s' % container_id)
 
     app_logic = AppLogic(loop, container_id)
 

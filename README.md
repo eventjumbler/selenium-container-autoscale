@@ -13,7 +13,7 @@ your containers when you're finished. It also has no unit tests and may be prone
 
 ### Prerequisites
 
-hyper.sh cli:  https://console.hyper.sh/cli/download  (you will need to sign up)
+hyper.sh cli:  https://console.hyper.sh/cli/download  (you will need to sign up, the free tier will not be sufficient)
 
 docker:        https://docs.docker.com/engine/installation/  if you wish to modify and build this project
 
@@ -27,7 +27,9 @@ Set environment variables and run hyper config:
 ```
 export HYPERSH_ACCESS_KEY=<your_access_key>
 export HYPERSH_SECRET=<your_secret_key>
-hyper config --accesskey $HYPERSH_ACCESS_KEY --secretkey $HYPERSH_SECRET --default-region eu-central-1    # or: us-west-1
+export HYPERSH_REGION=eu-central-1  # or us-west-1
+
+hyper config --accesskey $HYPERSH_ACCESS_KEY --secretkey $HYPERSH_SECRET --default-region $HYPERSH_REGION
 ```
 
 #### Running
@@ -36,11 +38,11 @@ Running the service is easy. 1) Pull the docker images 2) create a public IP add
 
 1) Pull the images for the proxy and selenium nodes into your hyper.sh account:
 ```
-hyper pull digiology/serviceproxy_sanic_async
+hyper pull eventjumbler/selenium-proxy
 hyper pull digiology/selenium_node
 ```
 
-2) Create a public IP address (note: hyper.sh charges $1/month per address). We need an IP for the proxy if we're running out tests/clients outside of hyper.sh's network.
+2) Create a public IP address (note: hyper.sh charges $1/month per address). We need an IP for the proxy if we're running our tests/clients outside of hyper.sh's network.
 ```
 hyper fip allocate 1
 hyper fip ls   # returns your new IP
@@ -48,17 +50,17 @@ hyper fip ls   # returns your new IP
 
 3) Run the proxy container and attach the IP address
 ```
-hyper run -p 5000:5000 -d --name seleniumproxy <repo_path>   # TODO: check that main/main.py is actually launched
+hyper run -p 5000:5000 -d --name seleniumproxy <repo_path>
 hyper fip attach <ip_address> seleniumproxy
 ```
 
 ## Testing that it's running
 
 ```
-hyper ps
+hyper ps -a
 
 CONTAINER ID        IMAGE                                COMMAND             CREATED             STATUS              PORTS                    NAMES                    PUBLIC IP
-c268a11ea31f        digiology/serviceproxy_sanic_async   "/bin/bash"         3 minutes ago       Up 3 minutes        0.0.0.0:5000->5000/tcp   seleniumproxy            <ip_address>
+c268a11ea31f        eventjumbler/selenium-proxy          "/bin/bash"         3 minutes ago       Up 3 minutes        0.0.0.0:5000->5000/tcp   seleniumproxy            <ip_address>
 
 
 curl http://<ip_address>:5000/test/
@@ -82,10 +84,10 @@ In python you would do:
 Now we will be able to see that hyper.sh has launched a new container:
 
 ```
-hyper ps
+hyper ps -a
 
 CONTAINER ID        IMAGE                                COMMAND             CREATED             STATUS              PORTS                    NAMES                    PUBLIC IP
-c268a11ea31f        digiology/serviceproxy_sanic_async   "/bin/bash"         3 minutes ago       Up 3 minutes        0.0.0.0:5000->5000/tcp   seleniumproxy            <ip_address>
+c268a11ea31f        eventjumbler/selenium-proxy          "/bin/bash"         3 minutes ago       Up 3 minutes        0.0.0.0:5000->5000/tcp   seleniumproxy            <ip_address>
 530a67042f52        digiology/selenium_node              "/bin/bash"         2 minutes ago       Up 2 minutes        0.0.0.0:5000->5000/tcp   seleniumnode33shj34j3a
 ```
 

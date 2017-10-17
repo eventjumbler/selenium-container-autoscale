@@ -1,4 +1,16 @@
-from proxy.util import http_get, http_post
+from proxy.util import http_get, http_post, CAPABILITIES
+
+
+NEW_SESSION_REQ_BODY = {
+    "capabilities": {
+        "firstMatch": [{}],
+        "alwaysMatch": {
+            "acceptInsecureCerts": True,
+            "browserName": "firefox"
+        }
+    },
+    "desiredCapabilities": CAPABILITIES
+}
 
 
 def get_page(driver_dict, url):
