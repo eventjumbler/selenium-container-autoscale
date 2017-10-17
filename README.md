@@ -159,7 +159,7 @@ containers before they are required.
 
 * Each selenium node runs selenium grid's hub, which is unnecessary. It's simply how I initially got it running during development and haven't changed it yet. I'm guessing the hub can run on the proxy server.
 
-# No documentation for building your own version of: https://github.com/eventjumbler/selenium-container-node  (though it shouldn't be too hard: clone repo, run build_docker.sh, set the SELENIUM_NODE_IMAGE environment variable and rebuild the image for the proxy server)
+* No documentation for building your own version of: https://github.com/eventjumbler/selenium-container-node  (though it shouldn't be too hard: clone repo, run build_docker.sh, set the SELENIUM_NODE_IMAGE environment variable and rebuild the image for the proxy server)
 
 ## Contributing
 
