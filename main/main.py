@@ -12,6 +12,7 @@ from proxy.driver_responses import new_driver_resp, quit_response
 from proxy.logic import AppLogic, ping_wait
 import json
 import datetime
+import logging
 
 NEW_DRIVER = 0
 GET_COMMAND = 1
@@ -144,6 +145,7 @@ async def query_driver(request, driver_url):
         # otherwise, continue as normal and proxy request below
 
     if request_type == QUIT_COMMAND:
+        print('quitting driver')
         await app_logic.quit_driver(selenium_id)
         return quit_response(selenium_id)
 
@@ -244,7 +246,11 @@ if __name__ == '__main__':
     # app.run(host="0.0.0.0", port=5000, debug=True, workers=1)
 
     # another method for starting server, gives access to the event loop NOTE: this way doesn't support multiple processes
-    server = sanic_app.create_server(host="0.0.0.0", port=5000, debug=True)  # num_workers?
+
+    logging.getLogger('asyncio').setLevel(logging.WARNING)
+
+    server = sanic_app.create_server(host="0.0.0.0", port=5000, debug=True, log_config=None)
+
     loop = asyncio.get_event_loop()
 
     succ, container_id, err = sys_call('hostname')

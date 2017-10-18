@@ -30,7 +30,9 @@ async def get_page_async(driver_dict, url):
 
     status, resp_json = await http_post(post_url, json={'sessionId': selenium_sess_id, 'url': url})
 
-    return status in (200, 201, 204) and resp_json['state'] == 'success'
+    print('get_page_async() %s %s' % (status, resp_json))
+
+    return status in (200, 201, 204)# and resp_json['state'] == 'success'
 
 
 

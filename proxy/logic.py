@@ -6,8 +6,8 @@ from asyncio.subprocess import PIPE
 from subprocess import Popen, PIPE
 import os
 import logging
+import sys
 
-import aiohttp
 import requests
 from requests.exceptions import ConnectionError
 from hypersh_client.main.hypersh2 import HypershClient
@@ -23,7 +23,7 @@ MAX_DRIVERS_PER_CONTAINER = 3
 SESSION_TYPE = 'asycnio'  # 'requests'
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 
@@ -110,6 +110,8 @@ class AppLogic(object):
 
         if success:
             self.leftover_drivers.append(selenium_id)
+        else:
+            logger.error('quit_driver(): driver not added to leftovers because get_page_async() failed')
 
     def sort_leftovers(self):
         """
@@ -222,7 +224,7 @@ class AppLogic(object):
 
     def notify_container_down(self, container_name):
         to_delete = []
-        for session_id, di in self.drivers:
+        for session_id, di in self.drivers.items():
             if di['container'] == container_name:
                 to_delete.append(session_id)
 
