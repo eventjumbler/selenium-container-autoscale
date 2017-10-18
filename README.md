@@ -37,7 +37,7 @@ Running the service is easy. 1) Pull the docker images 2) create a public IP add
 1) Pull the images for the proxy and selenium nodes into your hyper.sh account:
 ```
 hyper pull eventjumbler/selenium-proxy
-hyper pull digiology/selenium_node
+hyper pull eventjumbler/selenium-node
 ```
 
 2) Create a public IP address (note: hyper.sh charges $1/month per address). We need an IP for the proxy if we're running our tests/clients outside of hyper.sh's network.
@@ -86,7 +86,7 @@ hyper ps -a
 
 CONTAINER ID        IMAGE                                COMMAND             CREATED             STATUS              PORTS                    NAMES                    PUBLIC IP
 c268a11ea31f        eventjumbler/selenium-proxy          "/bin/bash"         3 minutes ago       Up 3 minutes        0.0.0.0:5000->5000/tcp   seleniumproxy            <ip_address>
-530a67042f52        digiology/selenium_node              "/bin/bash"         2 minutes ago       Up 2 minutes        0.0.0.0:5000->5000/tcp   seleniumnode33shj34j3a
+530a67042f52        eventjumbler/selenium-node           "/bin/bash"         2 minutes ago       Up 2 minutes        0.0.0.0:5000->5000/tcp   seleniumnode33shj34j3a
 ```
 
 Note: the system is configured to run up to 3 Firefox instances per "M2" (dual-core, 2GB RAM) container so creating another Remote driver won't spin up another container.
@@ -132,7 +132,15 @@ Build the container and push to your docker repository:
 Pull the image into hyper.sh
 ```
 hyper pull <repo_path>
-hyper pull digiology/selenium_node
+hyper pull eventjumbler/selenium-node
+```
+
+You can also build your own version of the node servers:
+```
+export SELENIUM_NODE_IMAGE=<docker_repo_for_node_image>
+git clone https://github.com/eventjumbler/selenium-container-node.git
+cd selenium-container-node
+./build_docker.sh <repo_for_node_image>
 ```
 
 
