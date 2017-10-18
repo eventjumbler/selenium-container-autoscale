@@ -25,8 +25,6 @@ Go to https://console.hyper.sh/account/credential and click 'Create credential' 
 
 Set environment variables and run hyper config:
 ```
-
-
 hyper config --accesskey $HYPERSH_ACCESS_KEY --secretkey $HYPERSH_SECRET --default-region $HYPERSH_REGION
 ```
 
@@ -72,7 +70,8 @@ In python you would do:
 
 ```
 >>> from selenium.webdriver import Remote
->>> capabilities = {'platform': 'ANY', 'browserName': 'firefox', 'version': '', 'marionette': True, 'javascriptEnabled': True}
+>>> from selenium.webdriver import DesiredCapabilities
+>>> capabilities = DesiredCapabilities().FIREFOX
 >>> driver = Remote('http://<ip_address>:5000/driver/wd/hub', desired_capabilities=capabilities)
 >>> driver.get('https://google.com')
 >>> driver.title
