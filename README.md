@@ -73,7 +73,7 @@ In python you would do:
 ```
 >>> from selenium.webdriver import Remote
 >>> capabilities = {'platform': 'ANY', 'browserName': 'firefox', 'version': '', 'marionette': True, 'javascriptEnabled': True}
->>> driver = Remote('http://<ip_address>:5000/wd/hub', desired_capabilities=capabilities)
+>>> driver = Remote('http://<ip_address>:5000/driver/wd/hub', desired_capabilities=capabilities)
 >>> driver.get('https://google.com')
 >>> driver.title
 'Google'
@@ -96,7 +96,7 @@ When a driver is quit, the proxy will keep it for later reuse:
 >>> driver.session_id
 '0eded26f-06af-af4f-84b2-13b689385499'
 >>> driver.quit()
->>> driver = Remote('http://<ip_address>:5000/wd/hub', desired_capabilities=capabilities)  # notice how quickly this returns!
+>>> driver = Remote('http://<ip_address>:5000/driver/wd/hub', desired_capabilities=capabilities)  # notice how quickly this returns!
 >>> driver.session_id
 '0eded26f-06af-af4f-84b2-13b689385499'   # same as above
 ```
