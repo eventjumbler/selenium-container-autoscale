@@ -353,10 +353,10 @@ class AppLogic(object):
 
         success, req_session, resp_json = await self._launch_driver_on_container(req_body, container_name)
 
-        selenium_session_id = resp_json['value']['sessionId']
-
         if success is False:
             return False, None
+
+        selenium_session_id = resp_json['value']['sessionId']
 
         self.drivers[selenium_session_id] = {
             'requests_session': req_session,
