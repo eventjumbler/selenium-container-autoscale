@@ -7,7 +7,7 @@ from subprocess import Popen, PIPE
 import os
 import logging
 import sys
-
+from urllib3.exceptions import NewConnectionError
 import requests
 from requests.exceptions import ConnectionError
 from hypersh_client.main.hypersh2 import HypershClient
@@ -67,19 +67,6 @@ class AppLogic(object):
         session. Otherwise launch a new driver.
         """
         print('launch_driver() called')
-        if reuse_session:
-            if reuse_session in self.leftover_drivers:
-                self._create_from_leftover(reuse_session)
-                return True, False, self.drivers[reuse_session]
-                # else, ignore and continue as normal
-            else:
-                if reuse_session in self.drivers:
-                    logger.warning(
-                        'warning: reuse_session not found in leftovers, '
-                        'you need to call driver.quit() or /quit_driver/ first'
-                    )
-                else:
-                    logger.error('warning: reuse_session not found, driver session doesn\'t exist')
 
         # pops leftover_ids, queries containers for their active sessions
         leftover_id = await self._find_leftover()
@@ -166,13 +153,15 @@ class AppLogic(object):
                 if success:
                     return True
                 logger.info('_get_active_sessions() failed, this is normal while the container is initialising (http status: %s)' % status)
+            except NewConnectionError:
+                logger.info('waiting for selenium-grid to initialise on container (POST to /wd/hub/sessions/ gave a NewConnectionError)')
             except Exception as e:
                 logger.error('exception from _get_active_sessions() %s' % e)
 
             await asyncio.sleep(0.5)
 
         if i == 13:
-            logger.error('warning: container not ready /wd/hub/sessions failed to load in time, continuing anyway')
+            logger.error('container not ready /wd/hub/sessions failed to load in time, continuing anyway')
         return False
 
     async def _launch_container(self):
@@ -286,10 +275,11 @@ class AppLogic(object):
     async def get_running_containers(self):
         now = datetime.datetime.now()
         fifteen_secs_agp = datetime.timedelta(seconds=7)
+
         if self.running_containers_cache is None or now-self.running_containers_last_checked > fifteen_secs_agp:
 
             success, running_containers = self.hyper_client.get_containers(image=NODE_IMAGE)
-            # old version: running_containers = await get_running_containers_async(self.loop, 'digiology/selenium_node')
+
             if not success:
                 print('warning: failed to get running containers from hypersh')
 
@@ -306,7 +296,7 @@ class AppLogic(object):
                 self.notify_container_down(cn)
 
         def is_valid(di):
-            if di['container'] in running_containers and di['state'] != 'DRIVER_LAUNCH_FAILED':
+            if di['container'] in running_containers:# and di['state'] != 'DRIVER_LAUNCH_FAILED':
                 return True
             return False
 
@@ -373,7 +363,6 @@ class AppLogic(object):
             'requests_session': req_session,
             #'aiohttp_session': req_session,
             'selenium_session_id': selenium_session_id,
-            'state': 'DRIVER_STARTED',
             'container': container_name,
             'last_command_time': datetime.datetime.now(),
             'creation_resp_json': resp_json
@@ -387,7 +376,6 @@ class AppLogic(object):
                 self.leftover_drivers.remove(leftover_id)
             except:  # possible race condition
                 return False
-        self.drivers[leftover_id]['state'] = 'DRIVER_STARTED'
         self.drivers[leftover_id]['last_command_time'] = datetime.datetime.now()
         return True
 
@@ -430,3 +418,24 @@ async def ping_wait(container_name, wait=9):
         await asyncio.sleep(0.35)
     print('finished pinging without succeeding')
     return False
+
+
+
+# old code:
+'''
+def launch_driver():
+
+if reuse_session:
+    if reuse_session in self.leftover_drivers:
+        self._create_from_leftover(reuse_session)
+        return True, False, self.drivers[reuse_session]
+        # else, ignore and continue as normal
+    else:
+        if reuse_session in self.drivers:
+            logger.warning(
+                'warning: reuse_session not found in leftovers, '
+                'you need to call driver.quit() or /quit_driver/ first'
+            )
+        else:
+            logger.error('warning: reuse_session not found, driver session doesn\'t exist')
+'''

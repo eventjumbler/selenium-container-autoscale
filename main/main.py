@@ -13,6 +13,8 @@ from proxy.logic import AppLogic, ping_wait
 import json
 import datetime
 import logging
+from proxy.logic import sys_call
+
 
 NEW_DRIVER = 0
 GET_COMMAND = 1
@@ -20,8 +22,6 @@ QUIT_COMMAND = 2
 OTHER = 3
 SESSION_ID_REGEXP = r'/(?P<selenium_id>\w{8}-\w{4}-\w{4}-\w{4}-\w{12})'
 
-#PRODUCTION = True
-#HYPER_FIP = '199.245.57.93'
 
 sanic_app = Sanic(__name__)
 sanic_app.config.REQUEST_TIMEOUT = 90  # default is 60
@@ -68,11 +68,6 @@ async def quit_driver(request):
 @sanic_app.route('/test/', methods=['GET'])
 async def test_view(request):
     return text_resp('success!')
-    await ping_wait('google.com', loop, wait=20)
-    end = datetime.datetime.now()
-    print('ping took:')
-    print(end-start)
-    return text_resp('test_view')
 
 
 @sanic_app.route('/shutdown_nodes/', methods=['POST'])
@@ -130,20 +125,6 @@ async def query_driver(request, driver_url):
 
         raise SanicException('driver launch failed', 500)
 
-    # elif request_type == GET_COMMAND:
-    #     pass
-        # too complex, lets leave this out
-        # retry_count = 0
-        # while app_logic.drivers[driver_id]['state'] == 'PAGE_GET_IN_PROGRESS' and retry_count < 100:
-        #     await asyncio.sleep(0.2); retry_count += 1
-        #
-        # if app_logic.drivers[driver_id]['state'] == 'PAGE_GET_SUCCESS':
-        #     return page_get_response(app_logic.drivers[driver_id]['selenium_session_id'])
-        # elif app_logic.drivers[driver_id]['state'] == 'PAGE_GET_FAILED':
-        #     return page_get_response(app_logic.drivers[driver_id]['selenium_session_id'], 'error')
-
-        # otherwise, continue as normal and proxy request below
-
     if request_type == QUIT_COMMAND:
         print('quitting driver')
         await app_logic.quit_driver(selenium_id)
@@ -152,18 +133,6 @@ async def query_driver(request, driver_url):
     container_name = app_logic.drivers[selenium_id]['container']
     url = 'http://' + container_name + ':5555/' + driver_url
     sess = app_logic.drivers[selenium_id]['requests_session']
-
-    # resp = await loop.run_in_executor(
-    #     None, do_selenium_request, (request, sess, url)
-    # )
-    # if request.method == 'POST':
-    #     resp = await loop.run_in_executor(None, sess.post, (url, request.body))
-    #     # resp = sess.post(url, data=request.body)
-    # elif request.method == 'GET':
-    #     resp = await loop.run_in_executor(None, sess.get, (url, request.body))
-    #     resp = sess.get(url, params=dict(request.args))
-    # elif request.method == 'DELETE':
-    #     resp = sess.delete(url)
 
     # to read: http://mahugh.com/2017/05/23/http-requests-asyncio-aiohttp-vs-requests/
     # to read: https://gist.github.com/snehesht/c8ef95850c550dc47126
@@ -225,30 +194,10 @@ async def query_driver(request, driver_url):
 #     raise SanicException('problem in do_selenium_request(): %s %s' % (request.method, status))
 
 
-'''
-15:28:49.911 INFO - Handler thread for session 73f76d24-7085-4078-968c-2e6749211cc8 (firefox): Executing POST on /session/73f76d24-7085-4078-968c-2e6749211cc8/url (handler: ServicedSession)
-15:28:49.919 INFO - To upstream: {"url": "http://soas.ac.uk", "sessionId": "73f76d24-7085-4078-968c-2e6749211cc8"}
-
-15:29:02.195 INFO - Handler thread for session 73f76d24-7085-4078-968c-2e6749211cc8 (firefox): Executing POST on /session/73f76d24-7085-4078-968c-2e6749211cc8/elements (handler: ServicedSession)
-15:29:02.203 INFO - To upstream: {"value": "//a", "using": "xpath", "sessionId": "73f76d24-7085-4078-968c-2e6749211cc8"}
-'''
-
-
-from proxy.logic import sys_call
-
 if __name__ == '__main__':
-    # from django.core.wsgi import get_wsgi_application
-    # django_application = get_wsgi_application()
-
-    # from data.models import Driver
-    # for driver_obj in Driver.objects.filter(status='active'):
-    #     app.driver_container_map[driver_obj.id] = driver_obj.node.container_name
-    # app.run(host="0.0.0.0", port=5000, debug=True, workers=1)
-
-    # another method for starting server, gives access to the event loop NOTE: this way doesn't support multiple processes
-
     logging.getLogger('asyncio').setLevel(logging.WARNING)
 
+    # NOTE: this way doesn't support multiple processes but gives you access to the event loop (regular version: # app.run(host="0.0.0.0", port=5000, debug=True, workers=1))
     server = sanic_app.create_server(host="0.0.0.0", port=5000, debug=True, log_config=None)
 
     loop = asyncio.get_event_loop()

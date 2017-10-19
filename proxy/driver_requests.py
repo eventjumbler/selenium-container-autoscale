@@ -32,7 +32,7 @@ async def get_page_async(driver_dict, url):
 
     print('get_page_async() %s %s' % (status, resp_json))
 
-    return status in (200, 201, 204)# and resp_json['state'] == 'success'
+    return status in (200, 201, 204)
 
 
 
