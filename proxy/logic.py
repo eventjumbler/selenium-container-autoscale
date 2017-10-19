@@ -15,6 +15,7 @@ from hypersh_client.main.hypersh2 import HypershClient
 from proxy.driver_requests import get_page_async, NEW_SESSION_REQ_BODY
 
 
+NODE_IMAGE = os.environ.get('SELENIUM_NODE_IMAGE', 'eventjumbler/selenium-node')
 NEW_SESSION_REQ_BODY_STR = json.dumps(NEW_SESSION_REQ_BODY)
 
 
@@ -176,11 +177,10 @@ class AppLogic(object):
 
     async def _launch_container(self):
         container_name = 'seleniumnode' + uuid(10)
-        image = os.environ.get('SELENIUM_NODE_IMAGE', 'eventjumbler/selenium-node')
 
-        logger.info('creating and starting container: %s from image: %s' % (container_name, image))
+        logger.info('creating and starting container: %s from image: %s' % (container_name, NODE_IMAGE))
         success, container_id = self.hyper_client.create_container(
-            image, name=container_name, size='M2',
+            NODE_IMAGE, name=container_name, size='M2',
             environment_variables={'PROXY_CONTAINER': self.proxy_container},
             tcp_ports=['4444', '5555']
         )
@@ -288,7 +288,7 @@ class AppLogic(object):
         fifteen_secs_agp = datetime.timedelta(seconds=7)
         if self.running_containers_cache is None or now-self.running_containers_last_checked > fifteen_secs_agp:
 
-            success, running_containers = self.hyper_client.get_containers(image='digiology/selenium_node')
+            success, running_containers = self.hyper_client.get_containers(image=NODE_IMAGE)
             # old version: running_containers = await get_running_containers_async(self.loop, 'digiology/selenium_node')
             if not success:
                 print('warning: failed to get running containers from hypersh')
