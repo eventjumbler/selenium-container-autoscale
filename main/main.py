@@ -110,20 +110,21 @@ async def query_driver(request, driver_url):
 
     if request_type == NEW_DRIVER:
 
-        reuse_session = json.loads(body_str).get('reuse_session')  # often None
+        # old: reuse_session = json.loads(body_str).get('reuse_session')
 
         start = datetime.datetime.now()
-        success, new_created, driver_dict = await app_logic.launch_driver(body_str, reuse_session or None)
-        # success, driver_dict = await loop.run_in_executor(   # or: await asyncio.wait_for(future, timeout, loop=loop)
-        #     None, app_logic.launch_driver, (reuse_session or None)
-        # )
+        success, new_created, driver_dict = await app_logic.launch_driver(body_str)
+
         end = datetime.datetime.now()
-        print('launch_driver took: %s ' % (end-start))
 
         if success:
+            print('launch_driver took: %s ' % (end - start))
             return json_resp(driver_dict['creation_resp_json'], 200)
 
-        raise SanicException('driver launch failed', 500)
+        if driver_dict:
+            return json_resp(driver_dict['creation_resp_json'], status=500)
+
+        return new_driver_resp(selenium_id, error=True)
 
     if request_type == QUIT_COMMAND:
         print('quitting driver')

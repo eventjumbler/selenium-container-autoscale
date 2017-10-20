@@ -69,8 +69,7 @@ success!
 In python you would do:
 
 ```
->>> from selenium.webdriver import Remote
->>> from selenium.webdriver import DesiredCapabilities
+>>> from selenium.webdriver import DesiredCapabilities, Remote
 >>> capabilities = DesiredCapabilities().FIREFOX
 >>> driver = Remote('http://<ip_address>:5000/driver/wd/hub', desired_capabilities=capabilities)
 >>> driver.get('https://google.com')

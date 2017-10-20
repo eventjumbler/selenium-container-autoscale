@@ -35,10 +35,11 @@ def main():
         setup_proxy_mode()
         base_url = 'http://' + PROXY_IP + ':5000/driver'
     else:
-        setup_node_mode()
+        #setup_node_mode()
         base_url = 'http://' + NODE_IP + ':5555'
 
     time.sleep(6)
+    print('creating driver')
     resp = requests.post(base_url + '/wd/hub/session', json=NEW_SESSION_REQ_BODY)
     if resp.status_code != 200:
         exit_error('create driver failed')
@@ -66,6 +67,10 @@ def main():
 
     print('result:')
     print(outer_html)
+
+    resp = requests.delete(base_url + '/wd/hub/session/' + session_id)
+    if resp.status_code != 200:
+        exit_error('failed to quit browser')
 
 
 
