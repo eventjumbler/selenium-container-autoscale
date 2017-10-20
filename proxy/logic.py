@@ -119,7 +119,7 @@ class AppLogic(object):
             return max(command_times)  # will be same for all drivers in a container
         self.leftover_drivers.sort(key=order_leftovers, reverse=True)
 
-    async def _wait_for_selenium_ready(self, container_name, wait_time=8):
+    async def _wait_for_selenium_ready(self, container_name, wait_time=12):
         """ Wait for selenium to initialise and respond to requests. """
         logger.info('waiting for selenium to ready, will retry get_active_sessions() for %s seconds' % wait_time)
 
