@@ -14,7 +14,7 @@ import json
 import datetime
 import logging
 from proxy.logic import sys_call
-
+from proxy.util import uuid, PORT
 
 NEW_DRIVER = 0
 GET_COMMAND = 1
@@ -26,9 +26,6 @@ SESSION_ID_REGEXP = r'/(?P<selenium_id>\w{8}-\w{4}-\w{4}-\w{4}-\w{12})'
 sanic_app = Sanic(__name__)
 sanic_app.config.REQUEST_TIMEOUT = 90  # default is 60
 
-
-def uuid(len):
-    return uuid4().hex[:len]
 
 
 def do_selenium_request(request, sess, url):
@@ -132,7 +129,7 @@ async def query_driver(request, driver_url):
         return quit_response(selenium_id)
 
     container_name = app_logic.drivers[selenium_id]['container']
-    url = 'http://' + container_name + ':5555/' + driver_url
+    url = 'http://' + container_name + ':' + PORT + '/' + driver_url
     sess = app_logic.drivers[selenium_id]['requests_session']
 
     # to read: http://mahugh.com/2017/05/23/http-requests-asyncio-aiohttp-vs-requests/

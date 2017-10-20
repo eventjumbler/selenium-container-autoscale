@@ -1,16 +1,17 @@
 import re
 import subprocess
 import os
-import time
 import traceback
 import sys
 import aiohttp
+import asyncio
+from uuid import uuid4
 from selenium.webdriver import DesiredCapabilities
 
 
 SIMULATION_MODE = False
 
-
+PORT = '5555'
 CAPABILITIES = DesiredCapabilities().FIREFOX
 
 
@@ -134,3 +135,7 @@ async def http_post(url, data=None, json=None, session=None):
 #             if response.status != 200:
 #                 return response.status, None
 #             return 200, (await response.json())
+
+
+def uuid(len):
+    return uuid4().hex[:len]

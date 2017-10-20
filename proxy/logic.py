@@ -1,6 +1,5 @@
 import json
 import datetime
-from uuid import uuid4
 import asyncio
 from asyncio.subprocess import PIPE
 from subprocess import Popen, PIPE
@@ -8,20 +7,18 @@ import os
 import logging
 import sys
 from urllib3.exceptions import NewConnectionError
-import requests
-from requests.exceptions import ConnectionError
 from hypersh_client.main.hypersh2 import HypershClient
 
-from proxy.driver_requests import get_page_async, NEW_SESSION_REQ_BODY
+from proxy.driver_requests import NEW_SESSION_REQ_BODY
+from proxy.selenium_client import SeleniumClient
+from proxy.util import uuid, PORT
 
 
 NODE_IMAGE = os.environ.get('SELENIUM_NODE_IMAGE', 'eventjumbler/selenium-node')
 NEW_SESSION_REQ_BODY_STR = json.dumps(NEW_SESSION_REQ_BODY)
 
 
-PORT = '5555'
 MAX_DRIVERS_PER_CONTAINER = 3
-SESSION_TYPE = 'asycnio'  # 'requests'
 
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
@@ -29,81 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 def base_url(container_name):
-    #from main_new2 import PRODUCTION, HYPER_FIP
-    host = container_name #if PRODUCTION else HYPER_FIP
+    host = container_name
     return 'http://' + host + ':' + PORT
-
-
-def uuid(len):
-    return uuid4().hex[:len]
-
-
-class SeleniumClient(object):
-
-    def __init__(self, loop):
-        self.loop = loop
-
-    async def get_active_sessions(self, containers):
-        if len(containers) == 1:
-            success, status, sessions = await self._get_active_sessions(
-                containers[0]
-            )
-            return success, sessions
-
-        results = []
-        success = False
-        for container in containers:
-            succ, status, sessions = await self._get_active_sessions(container)
-            if succ:
-                success = True
-                results.extend(sessions)
-        return success, results
-
-    async def _get_active_sessions(self, container):
-        try:
-            resp = await self.loop.run_in_executor(None, requests.get, base_url(container) + '/wd/hub/sessions')
-        except:
-            return False, None, None
-
-        if resp.status_code != 200:
-            print('GET /wd/hub/sessions status: %s  %s' % (resp.status_code , resp.content.decode()))
-            return False, resp.status_code, []
-
-        resp_json = json.loads(resp.content.decode())
-
-        active_sessions = [di['id'] for di in resp_json['value']]
-
-        logger.info('get_active_sessions() called: %s' % active_sessions)
-
-        return True, 200, active_sessions
-
-    async def _launch_driver_on_container(self, req_body, container_name):
-        logger.info('launching driver on: ' + base_url(container_name))
-
-        req_session = requests.Session()
-        url = base_url(container_name) + '/wd/hub/session'
-
-        try:
-            resp = await self.loop.run_in_executor(None, req_session.post, url, req_body)
-        except Exception as e:
-            logger.error('exception thrown when attemtping to launch driver')
-            return False, None, None
-
-        logger.info('finished driver launch attempt, status: %s' % resp.status_code)
-
-        if resp.status_code != 200:
-            logger.error('POST to %s failed, status: %s' % (url, resp.status_code))
-            return False, None, None
-
-        resp_json = json.loads(resp.content.decode())
-
-        return True, req_session, resp_json
-
-    async def get_page(self, container, session_id, url):
-        success = await get_page_async(container, session_id, url)
-        if not success:
-            logger.error('get_page_async() failed')
-        return success
 
 
 class AppLogic(object):
@@ -363,7 +287,6 @@ async def ping_wait(container_name, wait=9):
         await asyncio.sleep(0.35)
     print('finished pinging without succeeding')
     return False
-
 
 
 # old code:
