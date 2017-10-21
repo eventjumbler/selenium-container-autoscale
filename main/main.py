@@ -1,41 +1,27 @@
 import re
 import asyncio
-from signal import signal, SIGINT
-from uuid import uuid4
-import aiohttp
-from sanic import Sanic
-from sanic.exceptions import SanicException
-from sanic.response import json as json_resp
-from sanic.response import text as text_resp
-from sanic.response import HTTPResponse
-from proxy.driver_responses import new_driver_resp, quit_response
-from proxy.logic import AppLogic, ping_wait
 import json
 import datetime
 import logging
-from proxy.logic import sys_call
-from proxy.util import uuid, PORT
+from signal import signal, SIGINT
+
+from sanic import Sanic
+from sanic.response import json as json_resp
+from sanic.response import text as text_resp
+
+from proxy.driver_responses import new_driver_resp, quit_response
+from proxy.logic import AppLogic, sys_call
+from proxy.util import uuid, PORT, get_session_id
+
 
 NEW_DRIVER = 0
 GET_COMMAND = 1
 QUIT_COMMAND = 2
 OTHER = 3
-SESSION_ID_REGEXP = r'/(?P<selenium_id>\w{8}-\w{4}-\w{4}-\w{4}-\w{12})'
 
 
 sanic_app = Sanic(__name__)
 sanic_app.config.REQUEST_TIMEOUT = 90  # default is 60
-
-
-
-def do_selenium_request(request, sess, url):
-    if request.method == 'POST':
-        resp = sess.post(url, data=request.body)
-    elif request.method == 'GET':
-        resp = sess.get(url, params=dict(request.args))
-    elif request.method == 'DELETE':
-        resp = sess.delete(url)
-    return resp
 
 
 def driver_request_type(driver_url, method):
@@ -50,16 +36,6 @@ def driver_request_type(driver_url, method):
         ans = OTHER
     print(driver_url + ': ' + str(ans))
     return ans
-
-
-@sanic_app.route('/quit_driver/', methods=['POST'])
-async def quit_driver(request):
-    selenium_id = json.loads(request.body.decode())['selenium_session_id']
-
-    if selenium_id in app_logic.drivers and selenium_id not in app_logic.leftover_drivers:
-        await app_logic.quit_driver(selenium_id)
-
-    return text_resp('done')
 
 
 @sanic_app.route('/test/', methods=['GET'])
@@ -79,20 +55,32 @@ async def notify_node_shutdown(request, container_name):
     return text_resp('success!')
 
 
-def get_session_id(driver_url, body_str):
-    match = re.search(SESSION_ID_REGEXP, driver_url)
-
-    if match:
-        selenium_id = match.groupdict()['selenium_id']
-    elif body_str == '':
-        import pdb; pdb.set_trace()
-    else:
-        selenium_id = json.loads(body_str)['sessionId']  # based on assumption that this will always be in the response
-    return selenium_id
-
-
 @sanic_app.route('/driver/<driver_url:path>', methods=['GET', 'POST', 'DELETE'])
 async def query_driver(request, driver_url):
+
+    if '//' in driver_url:
+        driver_url = driver_url.replace('//', '/')
+
+    request_type = driver_request_type(driver_url, request.method)
+
+    if request_type == NEW_DRIVER:
+        # old: reuse_session = json.loads(body_str).get('reuse_session')
+        body_str = request.body.decode()
+        success, new_created, driver_dict = await app_logic.launch_driver(body_str)
+
+        if not success:
+            return json_resp(driver_dict['creation_resp_json'], status=500)
+
+        return json_resp(driver_dict['creation_resp_json'], 200)
+    elif request_type == QUIT_COMMAND:
+        selenium_id = get_session_id(driver_url, request.body.decode())
+        await app_logic.quit_driver(selenium_id)
+        return quit_response(selenium_id)
+
+    return await app_logic.proxy_selenium_request(request, driver_url)
+
+
+async def query_driver_old(request, driver_url):
 
     if '//' in driver_url:
         driver_url = driver_url.replace('//', '/')
@@ -132,64 +120,12 @@ async def query_driver(request, driver_url):
     url = 'http://' + container_name + ':' + PORT + '/' + driver_url
     sess = app_logic.drivers[selenium_id]['requests_session']
 
-    # to read: http://mahugh.com/2017/05/23/http-requests-asyncio-aiohttp-vs-requests/
-    # to read: https://gist.github.com/snehesht/c8ef95850c550dc47126
-    # need an asyn version of requests.get()  (possibility: https://stackoverflow.com/questions/22190403/how-could-i-use-requests-in-asyncio and client example here: https://aiohttp.readthedocs.io/en/stable/)
-    # todo: I think this is what it needs: https://aiohttp.readthedocs.io/en/stable/client_reference.html
+    status_code, resp_json = await do_selenium_request_async(request, sess, url)
+    if status_code != 200:
+        print('warning: selenium request gave status: %s' % status_code)
 
-    resp = await loop.run_in_executor(None, do_selenium_request, request, sess, url)
-    if resp.status_code != 200:
-        print('warning: selenium request gave status: %s' % resp.status_code)
-
-    return HTTPResponse(resp.content.decode(), status=resp.status_code, content_type="application/json")
-
-    #resp = await do_selenium_request(request, sess, url)
-    #return json_resp(await resp.read())
-    #return HTTPResponse((await resp.read()).decode(), status=200, content_type="application/json")
-
-
-# async def do_selenium_request_old(request, sess, url):  # todo: what about http headers?
-#     if request.method == 'GET':
-#         #resp = await sess.get(url,  params=dict(request.args))
-#
-#         async with aiohttp.get(url, params=dict(request.args)) as resp:
-#             if resp.status == 200:
-#                 return await resp
-#
-#     elif request.method == 'POST':
-#         #resp = await sess.post(url, data=request.body)
-#
-#         async with aiohttp.post(url, data=request.body) as resp:
-#             if resp.status == 200:
-#                 return await resp
-#
-#     elif request.method == 'DELETE':
-#         #resp = await sess.delete(url)
-#
-#         async with aiohttp.delete(url) as resp:
-#             if resp.status == 200:
-#                 return await resp
-#
-#     return resp
-#
-#
-# async def do_selenium_request(request, sess, url, ):
-#     resp = None
-#     if request.method == 'GET':
-#         async with aiohttp.ClientSession(loop=loop) as client:
-#             async with client.get(url, params=dict(request.args)) as resp:
-#                 return resp
-#     elif request.method == 'POST':
-#         async with aiohttp.ClientSession(loop=loop) as client:
-#             async with client.post(url, data=request.body) as resp:
-#                 return resp
-#     elif request.method == 'DELETE':
-#         async with aiohttp.ClientSession(loop=loop) as client:
-#             async with client.delete(url) as resp:
-#                 return resp
-#
-#     status = resp.status if resp else None
-#     raise SanicException('problem in do_selenium_request(): %s %s' % (request.method, status))
+    return json_resp(resp_json, status=status_code)
+    #return HTTPResponse(resp.content.decode(), status=resp.status_code, content_type="application/json")
 
 
 if __name__ == '__main__':

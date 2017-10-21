@@ -22,18 +22,6 @@ def get_page(driver_dict, url):
     return resp == 200 and '"state": "success"' in resp.content.decode()
 
 
-async def get_page_async(container, selenium_sess_id, url):
-
-    post_url = 'http://' + container + ':5555' + ('/wd/hub/session/%s/url' % selenium_sess_id)
-
-    status, resp_json = await http_post(post_url, json={'sessionId': selenium_sess_id, 'url': url})
-
-    print('get_page_async() %s %s' % (status, resp_json))
-
-    return status in (200, 201, 204)
-
-
-
 '''
 # driver.get() request
 

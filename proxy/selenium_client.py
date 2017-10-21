@@ -1,19 +1,33 @@
-import json
 import logging
-import requests
 import sys
+
+import aiohttp
+
+from proxy.util import http_get, http_post
 
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 
+def base_url(container_name):
+    return 'http://' + container_name + ':' + '5555'
+
+
 class SeleniumClient(object):
 
     def __init__(self, loop):
         self.loop = loop
+        self.req_sessions = {}
+
+    def get_req_session(self, container):
+        if container not in self.req_sessions:
+            self.req_sessions[container] = aiohttp.ClientSession()
+        return self.req_sessions[container]
 
     async def get_active_sessions(self, containers):
+        assert isinstance(containers, list)
+
         if len(containers) == 1:
             success, status, sessions = await self._get_active_sessions(
                 containers[0]
@@ -30,49 +44,56 @@ class SeleniumClient(object):
         return success, results
 
     async def _get_active_sessions(self, container):
+
         try:
-            resp = await self.loop.run_in_executor(None, requests.get, base_url(container) + '/wd/hub/sessions')
+            status, resp_json = await http_get(
+                base_url(container) + '/wd/hub/sessions',
+                session=self.get_req_session(container)
+            )
         except:
             return False, None, None
 
-        if resp.status_code != 200:
-            print('GET /wd/hub/sessions status: %s  %s' % (resp.status_code , resp.content.decode()))
-            return False, resp.status_code, []
-
-        resp_json = json.loads(resp.content.decode())
+        if status != 200:
+            print('GET /wd/hub/sessions status: %s  %s' % (status , resp_json))
+            return False, status, []
 
         active_sessions = [di['id'] for di in resp_json['value']]
-
-        logger.info('get_active_sessions() called: %s' % active_sessions)
-
+        logger.info('%s has sessions: %s ' % (container, active_sessions))
         return True, 200, active_sessions
 
     async def _launch_driver_on_container(self, req_body, container_name):
         from .logic import base_url
         logger.info('launching driver on: ' + base_url(container_name))
 
-        req_session = requests.Session()
         url = base_url(container_name) + '/wd/hub/session'
-
+        req_session = aiohttp.ClientSession()  # new session per driver (todo: if we implement proxying through this class we should store this session in another dictionary keyed by selenium_id)
         try:
-            resp = await self.loop.run_in_executor(None, req_session.post, url, req_body)
-        except Exception as e:
+            status_code, resp_json = await http_post(
+                url, data=req_body,
+                session=req_session
+            )
+        except:
             logger.error('exception thrown when attemtping to launch driver')
             return False, None, None
 
-        logger.info('finished driver launch attempt, status: %s' % resp.status_code)
+        logger.info('finished driver launch attempt, status: %s' % status_code)
 
-        if resp.status_code != 200:
-            logger.error('POST to %s failed, status: %s' % (url, resp.status_code))
+        if status_code != 200:
+            logger.error('POST to %s failed, status: %s' % (url, status_code))
             return False, None, None
-
-        resp_json = json.loads(resp.content.decode())
 
         return True, req_session, resp_json
 
-    async def get_page(self, container, session_id, url):
-        from .driver_requests import get_page_async
-        success = await get_page_async(container, session_id, url)
-        if not success:
+    async def get_page(self, container, selenium_sess_id, url):
+
+        url = 'http://'+container+':5555'+('/wd/hub/session/%s/url' % selenium_sess_id)
+
+        status_code, resp_json = await http_post(
+            url, json={'sessionId': selenium_sess_id, 'url': url},
+            session=self.get_req_session(container)
+        )
+
+        if status_code not in (200, 201, 204):
             logger.error('get_page_async() failed')
-        return success
+            return False
+        return True

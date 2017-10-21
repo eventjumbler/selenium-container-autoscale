@@ -7,12 +7,14 @@ import aiohttp
 import asyncio
 from uuid import uuid4
 from selenium.webdriver import DesiredCapabilities
+import json
 
 
 SIMULATION_MODE = False
 
 PORT = '5555'
 CAPABILITIES = DesiredCapabilities().FIREFOX
+SESSION_ID_REGEXP = r'/(?P<selenium_id>\w{8}-\w{4}-\w{4}-\w{4}-\w{12})'
 
 
 async def get_running_containers_async(loop, image=None):
@@ -96,46 +98,82 @@ def exception_info(e):
     return error_tuple
 
 
-async def http_get(url):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
+async def http_get(url, params=None, session=None):
+
+    async def do_get(sess):
+        async with sess.get(url, params=params) as resp:
             if resp.status not in (200, 201, 204):
                 return resp.status, None
             return 200, (await resp.json())
 
-'''
-async def http_get(url, session=None):
-    if session is None:
-        session = aiohttp.ClientSession()
-    with async_timeout.timeout(5):
-        async with session.get(url) as response:
-            if response.status != 200:
-                return response.status, None
-            return 200, (await response.json())
-'''
+    if session:
+        return await do_get(session)
+
+    async with aiohttp.ClientSession() as session:
+        return await do_get(session)
+
 
 async def http_post(url, data=None, json=None, session=None):
-    if data is None and json is None:
-        raise Exception('http_post: data is None and json is None')
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, data=data, json=json) as resp:
+    async def do_post(sess):
+        async with sess.post(url, data=data, json=json) as resp:
             if resp.status not in (200, 201, 204):
                 return resp.status, None
             return 200, (await resp.json())
 
-#
-# async def http_post(url, data=None, json=None, session=None):
-#     if data is None and json is None:
-#         raise Exception('http_post: data is None and json is None')
-#     if session is None:
-#         session = aiohttp.ClientSession()
-#     with async_timeout.timeout(5):
-#         async with session.post(url, data=data, json=json) as response:
-#             if response.status != 200:
-#                 return response.status, None
-#             return 200, (await response.json())
+    if session:
+        return await do_post(session)
+
+    async with aiohttp.ClientSession() as session:
+        return await do_post(session)
+
+
+async def http_delete(url, session=None):
+    async def do_delete(sess):
+        async with sess.delete(url) as resp:
+            if resp.status not in (200, 201, 204):
+                return resp.status, None
+            return 200, (await resp.json())
+
+    if session:
+        return await do_delete(session)
+
+    async with aiohttp.ClientSession() as session:
+        return await do_delete(session)
 
 
 def uuid(len):
     return uuid4().hex[:len]
+
+
+def do_selenium_request(request, sess, url):
+    if request.method == 'POST':
+        resp = sess.post(url, data=request.body)
+    elif request.method == 'GET':
+        resp = sess.get(url, params=dict(request.args))
+    elif request.method == 'DELETE':
+        resp = sess.delete(url)
+    return resp
+
+
+async def do_selenium_request_async(request, sess, url):
+    # todo: what about http headers?
+    if request.method == 'POST':
+        return await http_post(url, data=request.body, session=sess)
+    elif request.method == 'GET':
+        return await http_get(url, params=dict(request.args), session=sess)
+    elif request.method == 'DELETE':
+        return await http_delete(url, session=sess)
+    raise Exception('unexpected http method: ' + request.method)
+
+
+def get_session_id(driver_url, body_str):
+    match = re.search(SESSION_ID_REGEXP, driver_url)
+
+    if match:
+        selenium_id = match.groupdict()['selenium_id']
+    elif body_str == '':
+        import pdb; pdb.set_trace()
+    else:
+        selenium_id = json.loads(body_str)['sessionId']  # based on assumption that this will always be in the response
+    return selenium_id

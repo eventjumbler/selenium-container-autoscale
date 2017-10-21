@@ -7,6 +7,8 @@ RUN apt-get install -y git cron rsyslog supervisor
 
 ADD ./requirements.txt /requirements.txt
 RUN pip3 install -r requirements.txt
+# for some reason hypersh_client isn't getting updated, so run this again
+RUN pip3 install -e git+https://github.com/eventjumbler/hypersh_client.git#egg=hypersh_client
 
 RUN wget https://hyper-install.s3.amazonaws.com/hyper-linux-x86_64.tar.gz
 RUN tar xzf hyper-linux-x86_64.tar.gz

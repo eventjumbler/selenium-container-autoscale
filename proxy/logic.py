@@ -4,14 +4,17 @@ import asyncio
 from asyncio.subprocess import PIPE
 from subprocess import Popen, PIPE
 import os
+import random
 import logging
 import sys
+
+from hypersh_client.main.hypersh import HypershClient
+from sanic.response import json as json_resp
 from urllib3.exceptions import NewConnectionError
-from hypersh_client.main.hypersh2 import HypershClient
 
 from proxy.driver_requests import NEW_SESSION_REQ_BODY
 from proxy.selenium_client import SeleniumClient
-from proxy.util import uuid, PORT
+from proxy.util import uuid, PORT, get_session_id, do_selenium_request_async
 
 
 NODE_IMAGE = os.environ.get('SELENIUM_NODE_IMAGE', 'eventjumbler/selenium-node')
@@ -26,8 +29,16 @@ logger = logging.getLogger(__name__)
 
 
 def base_url(container_name):
-    host = container_name
-    return 'http://' + host + ':' + PORT
+    return 'http://' + container_name + ':' + PORT
+
+
+def create_container(app_logic, container_name):
+    self = app_logic
+    return self.hyper_client.create_container(
+        NODE_IMAGE, container_name, size='M2',
+        environment_variables={'PROXY_CONTAINER': self.proxy_container},
+        tcp_ports=['4444', '5555']
+    )
 
 
 class AppLogic(object):
@@ -144,11 +155,11 @@ class AppLogic(object):
         container_name = 'seleniumnode' + uuid(10)
 
         logger.info('creating and starting container: %s from image: %s' % (container_name, NODE_IMAGE))
-        success, container_id = self.hyper_client.create_container(
-            NODE_IMAGE, name=container_name, size='M2',
-            environment_variables={'PROXY_CONTAINER': self.proxy_container},
-            tcp_ports=['4444', '5555']
+
+        success, container_id = await self.loop.run_in_executor(
+            None, create_container, self, container_name
         )
+
         if not success:
             logger.error('error: problem when launching container')
             return False, None
@@ -178,7 +189,7 @@ class AppLogic(object):
         containers = self.container_capacities.keys()
         for container in containers:
             await self.loop.run_in_executor(  # hopefully doesn't stall?
-                None, self.hyper_client.remove_container, (container,)
+                None, self.hyper_client.remove_container, container
             )
             self.notify_container_down(container)
 
@@ -236,6 +247,26 @@ class AppLogic(object):
             # otherwise leftover_id will get discarded
 
         return None
+
+    async def proxy_selenium_request(self, request, driver_url):
+
+        body_str = request.body.decode()
+        selenium_id = get_session_id(driver_url, body_str)
+        container = self.drivers[selenium_id]['container']
+        request_session = self.drivers[selenium_id]['requests_session']
+        if random.randint(0, 10) == 9:  # for efficiency, we do this 1 in every 10 requests
+            self.drivers['last_command_time'] = datetime.datetime.now()
+
+        url = 'http://' + container + ':' + PORT + '/' + driver_url
+
+        status_code, resp_json = await do_selenium_request_async(
+            request, request_session, url
+        )
+        if status_code != 200:
+            print('warning: selenium request gave status: %s' % status_code)
+
+        return json_resp(resp_json, status=status_code)
+        # return HTTPResponse(resp.content.decode(), status=resp.status_code, content_type="application/json")
 
     def _create_from_leftover(self, leftover_id):
         if leftover_id in self.leftover_drivers:
@@ -328,7 +359,7 @@ async def get_running_containers(self):
 
     if self.running_containers_cache is None or now-self.running_containers_last_checked > fifteen_secs_agp:
 
-        success, running_containers = self.hyper_client.get_containers(image=NODE_IMAGE)
+        success, running_containers = self.hyper_client.get_containers(state='running', image=NODE_IMAGE)
 
         if not success:
             print('warning: failed to get running containers from hypersh')
