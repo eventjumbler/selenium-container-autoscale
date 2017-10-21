@@ -1,7 +1,5 @@
 import re
 import asyncio
-import json
-import datetime
 import logging
 from signal import signal, SIGINT
 
@@ -25,17 +23,14 @@ sanic_app.config.REQUEST_TIMEOUT = 90  # default is 60
 
 
 def driver_request_type(driver_url, method):
-
     if method == 'POST' and driver_url == 'wd/hub/session':
-        ans = NEW_DRIVER
+        return NEW_DRIVER
     elif method == 'POST' and re.search(r'wd/hub/session/[a-z0-9-]+?/url', driver_url) is not None:
-        ans = GET_COMMAND
+        return GET_COMMAND
     elif method == "DELETE" and driver_url.startswith('wd/hub/session/'):
-        ans = QUIT_COMMAND
+        return QUIT_COMMAND
     else:
-        ans = OTHER
-    print(driver_url + ': ' + str(ans))
-    return ans
+        return OTHER
 
 
 @sanic_app.route('/test/', methods=['GET'])
@@ -72,6 +67,7 @@ async def query_driver(request, driver_url):
             return json_resp(driver_dict['creation_resp_json'], status=500)
 
         return json_resp(driver_dict['creation_resp_json'], 200)
+
     elif request_type == QUIT_COMMAND:
         selenium_id = get_session_id(driver_url, request.body.decode())
         await app_logic.quit_driver(selenium_id)
@@ -80,58 +76,10 @@ async def query_driver(request, driver_url):
     return await app_logic.proxy_selenium_request(request, driver_url)
 
 
-async def query_driver_old(request, driver_url):
-
-    if '//' in driver_url:
-        driver_url = driver_url.replace('//', '/')
-
-    request_type = driver_request_type(driver_url, request.method)
-    body_str = request.body.decode()
-
-    selenium_id = None
-    if request_type != NEW_DRIVER:
-
-        selenium_id = get_session_id(driver_url, body_str)
-
-    if request_type == NEW_DRIVER:
-
-        # old: reuse_session = json.loads(body_str).get('reuse_session')
-
-        start = datetime.datetime.now()
-        success, new_created, driver_dict = await app_logic.launch_driver(body_str)
-
-        end = datetime.datetime.now()
-
-        if success:
-            print('launch_driver took: %s ' % (end - start))
-            return json_resp(driver_dict['creation_resp_json'], 200)
-
-        if driver_dict:
-            return json_resp(driver_dict['creation_resp_json'], status=500)
-
-        return new_driver_resp(selenium_id, error=True)
-
-    if request_type == QUIT_COMMAND:
-        print('quitting driver')
-        await app_logic.quit_driver(selenium_id)
-        return quit_response(selenium_id)
-
-    container_name = app_logic.drivers[selenium_id]['container']
-    url = 'http://' + container_name + ':' + PORT + '/' + driver_url
-    sess = app_logic.drivers[selenium_id]['requests_session']
-
-    status_code, resp_json = await do_selenium_request_async(request, sess, url)
-    if status_code != 200:
-        print('warning: selenium request gave status: %s' % status_code)
-
-    return json_resp(resp_json, status=status_code)
-    #return HTTPResponse(resp.content.decode(), status=resp.status_code, content_type="application/json")
-
-
 if __name__ == '__main__':
     logging.getLogger('asyncio').setLevel(logging.WARNING)
 
-    # NOTE: this way doesn't support multiple processes but gives you access to the event loop (regular version: # app.run(host="0.0.0.0", port=5000, debug=True, workers=1))
+    # NOTE: this way doesn't support multiple processes but gives you access to the event loop
     server = sanic_app.create_server(host="0.0.0.0", port=5000, debug=True, log_config=None)
 
     loop = asyncio.get_event_loop()
