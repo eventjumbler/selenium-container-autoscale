@@ -44,12 +44,11 @@ class AppLogic(object):
     def container_capacities(self):
         driver_counts = {}
         for driver_id, di in self.drivers.items():
-            container = di['container']
-            # should we skip if last_command_time > 10 minutes and assume it has been dropped?  (todo: set timeout on the selenium container, I think there is an env variable for this in selenium grid)
-            driver_counts[container] = driver_counts.get(container, 0) + 1
-        for container, count in driver_counts.items():
-            driver_counts[container] = MAX_DRIVERS_PER_CONTAINER - count
-        return driver_counts
+            driver_counts[di['container']] = driver_counts.get(di['container'], 0) + 1
+        return {
+            container: (MAX_DRIVERS_PER_CONTAINER-count)
+            for (container, count) in driver_counts.items()
+        }
 
     async def launch_driver(self, req_body):
 
@@ -63,13 +62,12 @@ class AppLogic(object):
 
         success, created, container_name = await self.get_or_create_container()
         if success is False:
-            raise Exception('failed to create new container')
+            return False, None, None
 
         if created:  # wait for selenium to start
             await asyncio.sleep(3.5)
             success = await self._wait_for_selenium_ready(container_name)
             if success is False:
-                logger.error('_wait_for_container_ready() timeout, launch_driver() aborted')
                 return False, None, None
 
         success, req_session, resp_json = await self.selenium_client._launch_driver_on_container(
@@ -121,10 +119,10 @@ class AppLogic(object):
 
     async def _wait_for_selenium_ready(self, container_name, wait_time=12):
         """ Wait for selenium to initialise and respond to requests. """
-        logger.info('waiting for selenium to ready, will retry get_active_sessions() for %s seconds' % wait_time)
+        logger.info('waiting for selenium to be ready, will retry get_active_sessions() for %s seconds' % wait_time)
 
         if (await self.ping_container(container_name)) is False:
-            logger.warning('_wait_for_selenium_ready() called on container that cannot curently be pinged')
+            logger.warning('_wait_for_selenium_ready() called on container that seems offline (ping failed)')
 
         iterations = round(wait_time/0.5)
         for i in range(iterations):
@@ -139,7 +137,7 @@ class AppLogic(object):
 
             await asyncio.sleep(0.5)
 
-        logger.info('selenium failed to be ready on %s after %s seconds' % (container_name, wait_time))
+        logger.warning('selenium failed to be ready on %s after %s seconds' % (container_name, wait_time))
         return False
 
     async def _launch_container(self):
