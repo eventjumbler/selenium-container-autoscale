@@ -14,7 +14,7 @@ NODE_IP = '185.207.112.31'
 def setup_proxy_mode():
     sys_call('hyper rm -f seleniumproxy')
 
-    sys_call('hyper run -p 5000:5000 -d --name seleniumproxy eventjumbler/selenium-proxy-test')
+    sys_call('hyper run -p 5000:5000 -d --name seleniumproxy eventjumbler/selenium-proxy')
     sys_call('hyper fip attach %s seleniumproxy' % PROXY_IP)
 
 
