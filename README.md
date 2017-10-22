@@ -28,7 +28,7 @@ Set environment variables and run hyper config:
 hyper config --accesskey $HYPERSH_ACCESS_KEY --secretkey $HYPERSH_SECRET --default-region $HYPERSH_REGION
 ```
 
-#### Running
+### Running
 
 Running the service is easy. 1) Pull the docker images 2) create a public IP address and 3) run the proxy container and attach the IP address
 
@@ -50,7 +50,7 @@ hyper run -p 5000:5000 -d --name seleniumproxy eventjumbler/selenium-proxy
 hyper fip attach <ip_address> seleniumproxy
 ```
 
-## Testing that it's running
+#### Testing that it's running
 
 ```
 hyper ps -a
@@ -64,7 +64,7 @@ curl http://<ip_address>:5000/test/
 success!
 ```
 
-## Creating a selenium browser instance
+### Creating a selenium browser instance
 
 In python you would do:
 
@@ -111,7 +111,7 @@ Or to remove ALL of your containers completely do:
 hyper rm -f `hyper ps -aq`
 ```
 
-### Building and deploying your own proxy server
+## Building and deploying from the source code
 
 First, create a new public Docker repository at: https://hub.docker.com
 
@@ -141,29 +141,26 @@ cd selenium-container-node
 ./build_docker.sh <repo_for_node_image>
 ```
 
-
-## Known Issues
+## Limitations
 
 * Limited to the firefox browser and hyper.sh hosting
 
 * The system is hard-coded to use hyper.sh's M2 (2 CPU cores, 2GB RAM) container instances for selenium nodes with a maximum of three Firefox instances per container.
 
-* Dockerfile installation items don't have any versions set, so the build risks breaking in future.
-
-* Container auto-shutdown is not implemented yet. Ideally selenium nodes would detect that no requests have arrived in quite a while and shut themselves down.
-
 * The proxy server only runs in a single process and so cannot take advantage of multiple cores on its host container. This was necessary in order to gain access to
 the asyncio event loop that Sanic uses. I'm open to suggestions on how to fix this. Each process could run on a separate port and perhaps be routed to by nginx, but
 the state stored in AppLogic would have to be shared somehow.
 
-* New remote connections sometimes timeout when a new container needs to be launched. It simply takes too long to both launch
-the container and launch a new browser instance (about 40-50 seconds). It's possible to change the timeout on the client side but
-it seems to require a bit of hacking (e.g. subclassing the Remote and RemoteConnection classes). A possible solution would be to prelaunch
-containers before they are required.
+
+## Known Issues
+
+* Dockerfile installation items don't have any versions set, so the build risks breaking in future.
+
+* Container auto-shutdown is not implemented yet. Ideally selenium nodes would detect that no requests have arrived in quite a while and shut themselves down.
 
 * It doesn't fail gracefully when you exceed your hyper.sh container quota. This is max 10 containers by default, to increase this you need to request a quota increase with them.
 
-* Each selenium node runs selenium grid's hub, which is unnecessary. It's simply how I initially got it running during development and haven't changed it yet. I'm guessing the hub can run on the proxy server.
+* Each selenium node runs selenium grid's hub, which is unnecessary. This is simply how I initially got it running during development and haven't changed it yet. I'm guessing the hub can run on the proxy server.
 
 * No documentation for building your own version of: https://github.com/eventjumbler/selenium-container-node  (though it shouldn't be too hard: clone repo, run build_docker.sh, set the SELENIUM_NODE_IMAGE environment variable and rebuild the image for the proxy server)
 
