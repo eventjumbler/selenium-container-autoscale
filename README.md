@@ -6,8 +6,8 @@ released and shutting down idle containers.
 
 It currently only works with Firefox hosted on hyper.sh containers but may expand to other browsers and container hosts in future.
 
-This is a work in progress and so should be used with some caution. In particular, auto-shutdown has not yet been implemented so be sure to shut down
-your containers when you're finished. It also has no unit tests and may be prone to race conditions when under heavy use (e.g. > 100 concurrent instances).
+This is a work in progress and so should be used with some caution. In particular it may be prone to race conditions when
+launching lots of instances concurrently.
 
 ## Getting Started
 
