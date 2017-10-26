@@ -24,7 +24,12 @@ docker:        https://docs.docker.com/engine/installation/  if you wish to modi
 Go to https://console.hyper.sh/account/credential and click 'Create credential' and save the keys somewhere safe.
 
 Set environment variables and run hyper config:
+
 ```
+export HYPERSH_ACCESS_KEY=<your_access_key>
+export HYPERSH_SECRET=<your_secret_key>
+export HYPERSH_REGION=eu-central-1  # or us-west-1
+
 hyper config --accesskey $HYPERSH_ACCESS_KEY --secretkey $HYPERSH_SECRET --default-region $HYPERSH_REGION
 ```
 
@@ -44,9 +49,9 @@ hyper fip allocate 1
 hyper fip ls   # returns your new IP
 ```
 
-3) Run the proxy container and attach the IP address
+3) Run the proxy container and attach the IP address. We'll need to pass it our hypersh keys:
 ```
-hyper run -p 5000:5000 -d --name seleniumproxy eventjumbler/selenium-proxy
+hyper run -p 5000:5000 -d --name seleniumproxy -e HYPERSH_ACCESS_KEY=$HYPERSH_ACCESS_KEY -e HYPERSH_SECRET=$HYPERSH_SECRET -e HYPERSH_REGION=$HYPERSH_REGION eventjumbler/selenium-proxy
 hyper fip attach <ip_address> seleniumproxy
 ```
 
@@ -115,13 +120,6 @@ hyper rm -f `hyper ps -aq`
 
 First, create a new public Docker repository at: https://hub.docker.com
 
-Set the following environment variables
-```
-export HYPERSH_ACCESS_KEY=<your_access_key>
-export HYPERSH_SECRET=<your_secret_key>
-export HYPERSH_REGION=eu-central-1  # or us-west-1
-```
-
 Build the container and push to your docker repository:
 ```
 ./build_docker.sh <repo_path>       # <repo_path> will be something like: myaccount/myrepo
@@ -156,7 +154,7 @@ the state stored in AppLogic would have to be shared somehow.
 
 * Dockerfile installation items don't have any versions set, so the build risks breaking in future.
 
-* Container auto-shutdown is not implemented yet. Ideally selenium nodes would detect that no requests have arrived in quite a while and shut themselves down.
+* Container auto-shutdown is not implemented yet. Ideally selenium nodes would detect that no requests have arrived in quite a while and shut themselves down. This is partially implemented here: https://github.com/eventjumbler/selenium-container-node/blob/master/detect_idle.py but needs testing more and to be run as a cron job.
 
 * It doesn't fail gracefully when you exceed your hyper.sh container quota. This is max 10 containers by default, to increase this you need to request a quota increase with them.
 

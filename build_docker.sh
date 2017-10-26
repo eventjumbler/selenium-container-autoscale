@@ -17,7 +17,7 @@ IFS='/' read -a myarray <<< "$REPO_PATH"
 REPO_NAME="${myarray[1]}"
 
 echo 'building image'
-BUILD_STDOUT=$(docker build -t $REPO_NAME:latest --build-arg HYPERSH_ACCESS_KEY=$HYPERSH_ACCESS_KEY --build-arg HYPERSH_SECRET=$HYPERSH_SECRET --build-arg HYPERSH_REGION=$HYPERSH_REGION .)
+BUILD_STDOUT=$(docker build -t $REPO_NAME:latest .)
 echo 'finished building image'
 
 IMAGE_ID=${BUILD_STDOUT: -12}
