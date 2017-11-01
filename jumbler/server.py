@@ -76,16 +76,18 @@ async def query_driver(request, driver_url):
     return await app_logic.proxy_selenium_request(request, driver_url)
 
 
-if __name__ == '__main__':
+def start():
     logging.getLogger('asyncio').setLevel(logging.WARNING)
 
-    # NOTE: this way doesn't support multiple processes but gives you access to the event loop
-    server = sanic_app.create_server(host="0.0.0.0", port=5000, debug=True, log_config=None)
+    # NOTE: this way doesn't support multiple processes but gives you access
+    # to the event loop
+    server = sanic_app.create_server(
+        host="0.0.0.0", port=5000, debug=True, log_config=None)
 
     loop = asyncio.get_event_loop()
 
     succ, container_id, err = sys_call('hostname')
-    if succ is False :
+    if succ is False:
         print('failed to get container_id')
     if succ is False or not container_id.strip():
         container_id = uuid(10)

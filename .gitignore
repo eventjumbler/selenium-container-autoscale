@@ -3,3 +3,5 @@ proxy/__pycache__
 *.pyc
 venv
 .idea
+Vagrantfile
+.vagrant/

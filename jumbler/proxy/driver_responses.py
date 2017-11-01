@@ -61,41 +61,67 @@ def _new_driver_resp_error(session_id):
         },
         "status": 13
     }
-    # original "message" value: "Process unexpectedly closed with status: 1\nBuild info: version: '3.6.0', revision: '6fbf3ec767', time: '2017-09-27T16:15:40.131Z'\nSystem info: host: '1bab8fee6817', ip: '172.16.0.174', os.name: 'Linux', os.arch: 'amd64', os.version: '4.4.62-hyper', java.version: '1.8.0_131'\nDriver info: driver.version: unknown\nremote stacktrace: stack backtrace:\n   0:           0x4f388c - backtrace::backtrace::trace::h736111741fa0878e\n   1:           0x4f38c2 - backtrace::capture::Backtrace::new::h63b8a5c0787510c9\n   2:           0x442d88 - webdriver::error::WebDriverError::new::hea6d4dbf778b2b24\n   3:           0x44a8c3 - geckodriver::marionette::MarionetteHandler::create_connection::hf8b6061dba65cdd0\n   4:           0x42ac91 - <webdriver::server::Dispatcher<T, U>>::run::hba9181b5aacf8f04\n   5:           0x402c59 - std::sys_common::backtrace::__rust_begin_short_backtrace::h19de262639927233\n   6:           0x40c065 - std::panicking::try::do_call::h6c1659fc4d01af51\n   7:           0x5e38ec - panic_unwind::__rust_maybe_catch_panic\n                        at /checkout/src/libpanic_unwind/lib.rs:98\n   8:           0x420d32 - <F as alloc::boxed::FnBox<A>>::call_box::h953e5f59694972c5\n   9:           0x5dc00b - alloc::boxed::{{impl}}::call_once<(),()>\n                        at /checkout/src/liballoc/boxed.rs:661\n                         - std::sys_common::thread::start_thread\n                        at /checkout/src/libstd/sys_common/thread.rs:21\n                         - std::sys::imp::thread::{{impl}}::new::thread_start\n                        at /checkout/src/libstd/sys/unix/thread.rs:84"
+    # original "message" value: "Process unexpectedly closed with status:
+    # 1\nBuild info: version: '3.6.0', revision: '6fbf3ec767', time:
+    # '2017-09-27T16:15:40.131Z'\nSystem info: host: '1bab8fee6817', ip:
+    # '172.16.0.174', os.name: 'Linux', os.arch: 'amd64', os.version:
+    # '4.4.62-hyper', java.version: '1.8.0_131'\nDriver info: driver.version:
+    # unknown\nremote stacktrace: stack backtrace:\n   0:           0x4f388c -
+    # backtrace::backtrace::trace::h736111741fa0878e\n   1:           0x4f38c2
+    # - backtrace::capture::Backtrace::new::h63b8a5c0787510c9\n   2:
+    # 0x442d88 - webdriver::error::WebDriverError::new::hea6d4dbf778b2b24\n
+    # 3:           0x44a8c3 -
+    # geckodriver::marionette::MarionetteHandler::create_connection::hf8b6061dba65cdd0\n
+    # 4:           0x42ac91 - <webdriver::server::Dispatcher<T,
+    # U>>::run::hba9181b5aacf8f04\n   5:           0x402c59 -
+    # std::sys_common::backtrace::__rust_begin_short_backtrace::h19de262639927233\n
+    # 6:           0x40c065 -
+    # std::panicking::try::do_call::h6c1659fc4d01af51\n   7:
+    # 0x5e38ec - panic_unwind::__rust_maybe_catch_panic\n
+    # at /checkout/src/libpanic_unwind/lib.rs:98\n   8:           0x420d32 -
+    # <F as alloc::boxed::FnBox<A>>::call_box::h953e5f59694972c5\n   9:
+    # 0x5dc00b - alloc::boxed::{{impl}}::call_once<(),()>\n
+    # at /checkout/src/liballoc/boxed.rs:661\n                         -
+    # std::sys_common::thread::start_thread\n                        at
+    # /checkout/src/libstd/sys_common/thread.rs:21\n                         -
+    # std::sys::imp::thread::{{impl}}::new::thread_start\n
+    # at /checkout/src/libstd/sys/unix/thread.rs:84"
     return json_resp(resp, 500)
 
 
 '''
 another version: 
 
-	"value": {
-		"sessionId": "ab671230-421b-44c8-934c-3c6ae314fa52",
-		"capabilities": {
-			"moz:profile": "/tmp/rust_mozprofile.NlwihK1sBXV0",
-			"rotatable": false,
-			"timeouts": {
-				"implicit": 0,
-				"pageLoad": 300000,
-				"script": 30000
-			},
-			"pageLoadStrategy": "normal",
-			"moz:headless": false,
-			"specificationLevel": 0,
-			"moz:accessibilityChecks": false,
-			"acceptInsecureCerts": true,
-			"browserVersion": "56.0",
-			"platformVersion": "4.4.62-hyper",
-			"moz:processID": 75,
-			"browserName": "firefox",
-			"platformName": "linux"
-		}
-	}
+    "value": {
+        "sessionId": "ab671230-421b-44c8-934c-3c6ae314fa52",
+        "capabilities": {
+            "moz:profile": "/tmp/rust_mozprofile.NlwihK1sBXV0",
+            "rotatable": false,
+            "timeouts": {
+                "implicit": 0,
+                "pageLoad": 300000,
+                "script": 30000
+            },
+            "pageLoadStrategy": "normal",
+            "moz:headless": false,
+            "specificationLevel": 0,
+            "moz:accessibilityChecks": false,
+            "acceptInsecureCerts": true,
+            "browserVersion": "56.0",
+            "platformVersion": "4.4.62-hyper",
+            "moz:processID": 75,
+            "browserName": "firefox",
+            "platformName": "linux"
+        }
+    }
 }
 
 '''
 
 
-def page_get_response(session_id, state='success'):  # for state strings see: https://github.com/SeleniumHQ/selenium/blob/ceaf3da79542024becdda5953059dfbb96fb3a90/third_party/closure/goog/net/eventtype.js
+# for state strings see:
+# https://github.com/SeleniumHQ/selenium/blob/ceaf3da79542024becdda5953059dfbb96fb3a90/third_party/closure/goog/net/eventtype.js
+def page_get_response(session_id, state='success'):
     return text_resp('''{
         "sessionId": "%(session_id)s",
         "state": "success",

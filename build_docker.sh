@@ -1,3 +1,4 @@
+#!/bin/sh
 if [ "$#" -ne 1 ]; then
     echo "invalid arguments"
     echo "usage: build_docker.sh <image_repo>"

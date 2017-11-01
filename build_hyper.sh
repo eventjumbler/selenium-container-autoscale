@@ -1,3 +1,4 @@
+#!/bin/sh
 if [ "$#" -ne 2 ]; then
     echo "invalid arguments"
     echo "usage: build_hyper.sh <image_repo> <ip_address>"

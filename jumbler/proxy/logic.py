@@ -57,7 +57,7 @@ class AppLogic(object):
         for driver_id, di in self.drivers.items():
             driver_counts[di['container']] = driver_counts.get(di['container'], 0) + 1
         return {
-            container: (MAX_DRIVERS_PER_CONTAINER-count)
+            container: (MAX_DRIVERS_PER_CONTAINER - count)
             for (container, count) in driver_counts.items()
         }
 
@@ -135,12 +135,12 @@ class AppLogic(object):
         if (await self.ping_container(container_name)) is False:
             logger.warning('_wait_for_selenium_ready() called on container that seems offline (ping failed)')
 
-        iterations = round(wait_time/0.5)
+        iterations = round(wait_time / 0.5)
         for i in range(iterations):
             try:
                 success, sessions = await self.selenium_client.get_active_sessions([container_name])
                 if success:
-                    logger.info('selenium ready on: '+container_name)
+                    logger.info('selenium ready on: ' + container_name)
                     return True
                 logger.info('_get_active_sessions() failed, this is normal while the container is initialising')
             except NewConnectionError:
@@ -287,8 +287,8 @@ async def sys_call_async(command):
 
 
 def sys_call(cmd_str, shell=False, suppress_errors=True):
-    p = Popen(cmd_str.split(), stdout=PIPE, stderr=PIPE, stdin=PIPE, shell=shell) #stderr=PIPE,
-    #p.communicate()
+    p = Popen(cmd_str.split(), stdout=PIPE, stderr=PIPE, stdin=PIPE, shell=shell)  # stderr=PIPE,
+    # p.communicate()
     stdout, stderr = p.stdout.read(), p.stderr.read()
     p.wait()
     success = p.returncode == 0
@@ -299,7 +299,7 @@ async def ping_wait(container_name, wait=9):
     print('poop')
     num_loops = round(wait / 0.35)
     #host = container_name if PRODUCTION else HYPER_FIP
-    command = "ping -c 1 " + container_name #+ " >/dev/null 2>&1"
+    command = "ping -c 1 " + container_name  # + " >/dev/null 2>&1"
 
     #command = 'ls -la sdfsdf'
     print('num loops: %s' % num_loops)
@@ -310,7 +310,7 @@ async def ping_wait(container_name, wait=9):
 
         if success:
             return True
-        print('stdout: '+ stdout)
+        print('stdout: ' + stdout)
         print('stderr: ' + stderr)
 
         await asyncio.sleep(0.35)
@@ -351,7 +351,6 @@ async def refresh(self):
 
     self.drivers = {sel_id: di for (sel_id, di) in self.drivers.items() if is_valid(di)}
     self.leftover_drivers = [id for id in self.leftover_drivers if id in self.drivers.keys()]
-    
 
 async def get_running_containers(self):
     now = datetime.datetime.now()
