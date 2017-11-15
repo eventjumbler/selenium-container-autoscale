@@ -50,7 +50,7 @@ async def get_running_containers_async(loop, image=None):
         if image is not None and container_image != image:
             continue
         container_details.append(
-            {'container_id': id, 'status':status, 'name': name, 'image': container_image}
+            {'container_id': id, 'status': status, 'name': name, 'image': container_image}
         )
     return container_details
 
@@ -73,7 +73,7 @@ def get_running_containers(image=None):
         if image is not None and container_image != image:
             continue
         container_details.append(
-            {'container_id': id, 'status':status, 'name': name, 'image': container_image}
+            {'container_id': id, 'status': status, 'name': name, 'image': container_image}
         )
     return container_details
 
@@ -173,7 +173,8 @@ def get_session_id(driver_url, body_str):
     if match:
         selenium_id = match.groupdict()['selenium_id']
     elif body_str == '':
-        import pdb; pdb.set_trace()
+        import pdb
+        pdb.set_trace()
     else:
         selenium_id = json.loads(body_str)['sessionId']  # based on assumption that this will always be in the response
     return selenium_id

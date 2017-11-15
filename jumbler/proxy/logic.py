@@ -1,21 +1,19 @@
-import json
-import datetime
 import asyncio
-from asyncio.subprocess import PIPE
-from subprocess import Popen, PIPE
+import datetime
+import json
+import logging
 import os
 import random
-import logging
 import sys
 
 from hypersh_client.main.hypersh import HypershClient
-from sanic.response import json as json_resp
 from urllib3.exceptions import NewConnectionError
 
+import proxy.cmd_utils as cmd_utils
 from proxy.driver_requests import NEW_SESSION_REQ_BODY
 from proxy.selenium_client import SeleniumClient
-from proxy.util import uuid, PORT, get_session_id, do_selenium_request_async
-
+from proxy.util import PORT, do_selenium_request_async, get_session_id, uuid
+from sanic.response import json as json_resp
 
 NODE_IMAGE = os.environ.get('SELENIUM_NODE_IMAGE', 'eventjumbler/selenium-node')
 NEW_SESSION_REQ_BODY_STR = json.dumps(NEW_SESSION_REQ_BODY)
@@ -23,13 +21,7 @@ NEW_SESSION_REQ_BODY_STR = json.dumps(NEW_SESSION_REQ_BODY)
 
 MAX_DRIVERS_PER_CONTAINER = 3
 
-
-logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
-
-
-def base_url(container_name):
-    return 'http://' + container_name + ':' + PORT
 
 
 def create_container(app_logic, container_name):
@@ -54,7 +46,7 @@ class AppLogic(object):
     @property
     def container_capacities(self):
         driver_counts = {}
-        for driver_id, di in self.drivers.items():
+        for _, di in self.drivers.items():
             driver_counts[di['container']] = driver_counts.get(di['container'], 0) + 1
         return {
             container: (MAX_DRIVERS_PER_CONTAINER - count)
@@ -165,7 +157,7 @@ class AppLogic(object):
             return False, None
 
         logger.info('pinging new container repeatedly for 22s to wait for launch')
-        success = await ping_wait(container_name, wait=22)
+        success = await cmd_utils.ping_wait(container_name, wait=22)
         if not success:
             logger.error('error: ping_wait for new container failed after 16 seconds pinging')
             return False, None
@@ -174,7 +166,7 @@ class AppLogic(object):
         return True, container_name
 
     async def ping_container(self, container_name, deep=False):
-        success, stdout, std_err = await sys_call_async("ping -c 1 " + container_name)
+        success, stdout, std_err = await cmd_utils.sys_call_async("ping -c 1 " + container_name)
         if success is False:
             return False
         if not deep:
@@ -276,46 +268,6 @@ class AppLogic(object):
                 return False
         self.drivers[leftover_id]['last_command_time'] = datetime.datetime.now()
         return True
-
-
-async def sys_call_async(command):
-    proc = await asyncio.create_subprocess_exec(*command.split(), stdout=PIPE, stderr=PIPE)   # or loop.subprocess_exec?
-    await proc.wait()
-    stdout, stderr = await proc.communicate()
-    success = proc.returncode == 0
-    return success, stdout.decode(), stderr.decode()
-
-
-def sys_call(cmd_str, shell=False, suppress_errors=True):
-    p = Popen(cmd_str.split(), stdout=PIPE, stderr=PIPE, stdin=PIPE, shell=shell)  # stderr=PIPE,
-    # p.communicate()
-    stdout, stderr = p.stdout.read(), p.stderr.read()
-    p.wait()
-    success = p.returncode == 0
-    return success, stdout, stderr
-
-
-async def ping_wait(container_name, wait=9):
-    print('poop')
-    num_loops = round(wait / 0.35)
-    #host = container_name if PRODUCTION else HYPER_FIP
-    command = "ping -c 1 " + container_name  # + " >/dev/null 2>&1"
-
-    #command = 'ls -la sdfsdf'
-    print('num loops: %s' % num_loops)
-
-    for i in range(num_loops):  # wait up to 9 seconds
-        print('ping!')
-        success, stdout, stderr = await sys_call_async(command)
-
-        if success:
-            return True
-        print('stdout: ' + stdout)
-        print('stderr: ' + stderr)
-
-        await asyncio.sleep(0.35)
-    print('finished pinging without succeeding')
-    return False
 
 
 # old code:

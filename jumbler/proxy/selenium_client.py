@@ -5,8 +5,6 @@ import aiohttp
 
 from proxy.util import http_get, http_post
 
-
-logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 
@@ -44,7 +42,6 @@ class SeleniumClient(object):
         return success, results
 
     async def _get_active_sessions(self, container):
-
         try:
             status, resp_json = await http_get(
                 base_url(container) + '/wd/hub/sessions',
@@ -54,7 +51,7 @@ class SeleniumClient(object):
             return False, None, None
 
         if status != 200:
-            print('GET /wd/hub/sessions status: %s  %s' % (status , resp_json))
+            print('GET /wd/hub/sessions status: %s  %s' % (status, resp_json))
             return False, status, []
 
         active_sessions = [di['id'] for di in resp_json['value']]
@@ -66,7 +63,10 @@ class SeleniumClient(object):
         logger.info('launching driver on: ' + base_url(container_name))
 
         url = base_url(container_name) + '/wd/hub/session'
-        req_session = aiohttp.ClientSession()  # new session per driver (todo: if we implement proxying through this class we should store this session in another dictionary keyed by selenium_id)
+        # new session per driver (todo: if we implement proxying through this
+        # class we should store this session in another dictionary keyed by
+        # selenium_id)
+        req_session = aiohttp.ClientSession()
         try:
             status_code, resp_json = await http_post(
                 url, data=req_body,
@@ -85,8 +85,7 @@ class SeleniumClient(object):
         return True, req_session, resp_json
 
     async def get_page(self, container, selenium_sess_id, url):
-
-        url = 'http://'+container+':5555'+('/wd/hub/session/%s/url' % selenium_sess_id)
+        url = 'http://' + container + ':5555' + ('/wd/hub/session/%s/url' % selenium_sess_id)
 
         status_code, resp_json = await http_post(
             url, json={'sessionId': selenium_sess_id, 'url': url},

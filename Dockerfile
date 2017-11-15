@@ -9,7 +9,6 @@ RUN apt-get update --fix-missing \
     && apt-get install -y git cron rsyslog supervisor
 
 # HyperSh
-# for some reason hypersh_client isn't getting updated, so run this again
 ENV HYPERSH_ACCESS_KEY ""
 ENV HYPERSH_SECRET ""
 ENV HYPERSH_REGION ""
