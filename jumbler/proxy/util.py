@@ -1,20 +1,24 @@
+import asyncio
+import json
+import logging
+import os
 import re
 import subprocess
-import os
-import traceback
 import sys
-import aiohttp
-import asyncio
+import traceback
 from uuid import uuid4
-from selenium.webdriver import DesiredCapabilities
-import json
 
+import aiohttp
+import proxy.rest_client as rest_client
+from selenium.webdriver import DesiredCapabilities
 
 SIMULATION_MODE = False
 
 PORT = '5555'
 CAPABILITIES = DesiredCapabilities().FIREFOX
 SESSION_ID_REGEXP = r'/(?P<selenium_id>\w{8}-\w{4}-\w{4}-\w{4}-\w{12})'
+
+_LOG = logging.getLogger(__name__)
 
 
 async def get_running_containers_async(loop, image=None):
@@ -80,7 +84,7 @@ def get_running_containers(image=None):
 
 async def is_online(container_name, wait=9):
     num_loops = round(wait / 0.3)
-    #host = container_name if PRODUCTION else HYPER_FIP
+    # host = container_name if PRODUCTION else HYPER_FIP
     for i in range(num_loops):  # wait up to 9 seconds
         response = os.system("ping -c 1 " + container_name + " >/dev/null 2>&1")
         if response == 0:
@@ -96,50 +100,6 @@ def exception_info(e):
     except_type, except_class, tb = sys.exc_info()
     error_tuple = (except_type, except_class, traceback.extract_tb(tb))
     return error_tuple
-
-
-async def http_get(url, params=None, session=None):
-
-    async def do_get(sess):
-        async with sess.get(url, params=params) as resp:
-            if resp.status not in (200, 201, 204):
-                return resp.status, None
-            return 200, (await resp.json())
-
-    if session:
-        return await do_get(session)
-
-    async with aiohttp.ClientSession() as session:
-        return await do_get(session)
-
-
-async def http_post(url, data=None, json=None, session=None):
-
-    async def do_post(sess):
-        async with sess.post(url, data=data, json=json) as resp:
-            if resp.status not in (200, 201, 204):
-                return resp.status, None
-            return 200, (await resp.json())
-
-    if session:
-        return await do_post(session)
-
-    async with aiohttp.ClientSession() as session:
-        return await do_post(session)
-
-
-async def http_delete(url, session=None):
-    async def do_delete(sess):
-        async with sess.delete(url) as resp:
-            if resp.status not in (200, 201, 204):
-                return resp.status, None
-            return 200, (await resp.json())
-
-    if session:
-        return await do_delete(session)
-
-    async with aiohttp.ClientSession() as session:
-        return await do_delete(session)
 
 
 def uuid(len):
@@ -159,11 +119,11 @@ def do_selenium_request(request, sess, url):
 async def do_selenium_request_async(request, sess, url):
     # todo: what about http headers?
     if request.method == 'POST':
-        return await http_post(url, data=request.body, session=sess)
+        return await rest_client.http_post(url, data=request.body, session=sess)
     elif request.method == 'GET':
-        return await http_get(url, params=dict(request.args), session=sess)
+        return await rest_client.http_get(url, params=dict(request.args), session=sess)
     elif request.method == 'DELETE':
-        return await http_delete(url, session=sess)
+        return await rest_client.http_delete(url, session=sess)
     raise Exception('unexpected http method: ' + request.method)
 
 

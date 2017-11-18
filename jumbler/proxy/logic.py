@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import random
+import re
 import sys
 
 from hypersh_client.main.hypersh import HypershClient
@@ -39,8 +40,8 @@ class AppLogic(object):
         self.loop = asyncio_loop
         self.leftover_drivers = []
         self.drivers = {}
-        self.proxy_container = proxy_container_id
-        self.hyper_client = HypershClient(os.environ.get('HYPERSH_REGION'))
+        self.proxy_container = cmd_utils.get_host()
+        self.hyper_client = HypershClient()
         self.selenium_client = SeleniumClient(self.loop)
 
     @property
@@ -241,7 +242,6 @@ class AppLogic(object):
         return None
 
     async def proxy_selenium_request(self, request, driver_url):
-
         body_str = request.body.decode()
         selenium_id = get_session_id(driver_url, body_str)
         container = self.drivers[selenium_id]['container']

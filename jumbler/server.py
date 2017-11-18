@@ -4,10 +4,13 @@ import re
 from signal import SIGINT, signal
 
 import proxy.cmd_utils as cmd_utils
-from proxy.driver_responses import new_driver_resp, quit_response
+from exception import BusinessError, ValidationError
+from proxy.business import BusinessLogic
+from proxy.driver_responses import quit_response
 from proxy.logic import AppLogic
 from proxy.util import get_session_id, uuid
 from sanic import Sanic
+from sanic.exceptions import InvalidUsage, ServerError
 from sanic.response import json as json_resp
 from sanic.response import text as text_resp
 
@@ -29,7 +32,8 @@ class SanicServer():
         self.sanic_app = Sanic(__name__, log_config=log_cfg)
         self.server = self.sanic_app.create_server(**server_cfg)
         self.loop = asyncio.get_event_loop()
-        self.app_logic = AppLogic(self.loop, self.__get_host())
+        self.app_logic = AppLogic(self.loop)
+        self.business_logic = BusinessLogic(self.loop)
         self.__config()
 
     def start(self):
@@ -51,15 +55,8 @@ class SanicServer():
         self.sanic_app.add_route(self.__shutdown_nodes, '/shutdown_nodes/', methods=['POST'])
         self.sanic_app.add_route(self.__notify_node_shutdown, '/container/<container_name:[A-z0-9_]{7,15}>', methods=['DELETE'])
         self.sanic_app.add_route(self.__query_driver, '/driver/<driver_url:path>', methods=['GET', 'POST', 'DELETE'])
-
-    def __get_host(self):
-        succ, container_id, _ = cmd_utils.sys_call('hostname')
-        if succ is False:
-            _LOG.debug('failed to get container_id')
-        if succ is False or not container_id.strip():
-            container_id = uuid(10)
-            _LOG.warning('No container_id found, (are you running outside a container?), generating false id: %s', container_id)
-        return container_id
+        self.sanic_app.add_route(self.__start_node, '/node', methods=['POST'])
+        self.sanic_app.add_route(self.__check_node_status, '/node/<node_name:[A-z0-9_]{7,15}>/status', methods=['GET'])
 
     def __driver_request_type(self, driver_url, method):
         if method == 'POST' and driver_url == 'wd/hub/session':
@@ -72,7 +69,6 @@ class SanicServer():
             return self.OTHER
 
     async def __test_view(self, request):
-        _LOG.info('Test')
         _LOG.info(request)
         return text_resp('success!')
 
@@ -100,3 +96,27 @@ class SanicServer():
             await self.app_logic.quit_driver(selenium_id)
             return quit_response(selenium_id)
         return await self.app_logic.proxy_selenium_request(request, driver_url)
+
+    async def __start_node(self, request):
+        _LOG.info('Start node')
+        browser = request.form.get('browser') if request.form else request.json['browser'] or 'firefox'
+        os_system = request.form.get('os') if request.form else request.json['os'] or 'unix'
+        if not re.compile(r'(?i)^(chrome|ie|edge|safari|firefox|phantomjs|opera)$').match(browser):
+            raise InvalidUsage('Browser is not support')
+        if not re.compile(r'(?i)^(unix|linux|windows|win)$').match(os_system):
+            raise InvalidUsage('OS system is not support')
+        _LOG.info(browser)
+        _LOG.info(os_system)
+        try:
+            return await json_resp(self.business_logic.start_node(browser.lower(), os_system), status=200)
+        except ValidationError as ve:
+            raise InvalidUsage(ve.message)
+        except BusinessError as be:
+            raise ServerError(be.message)
+
+    async def __check_node_status(self, request, node_name):
+        _LOG.info('Check node %s status', node_name)
+        try:
+            return await json_resp(self.business_logic.verify_node_status(node_name), status=200)
+        except BusinessError as be:
+            raise ServerError(be.message)

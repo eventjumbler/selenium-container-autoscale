@@ -1,6 +1,11 @@
 import asyncio
+import logging
 from asyncio.subprocess import PIPE
-from subprocess import Popen, PIPE
+from subprocess import Popen
+
+import proxy.util as util
+
+_LOG = logging.getLogger(__name__)
 
 async def sys_call_async(command):
     proc = await asyncio.create_subprocess_exec(*command.split(), stdout=PIPE, stderr=PIPE)   # or loop.subprocess_exec?
@@ -24,18 +29,26 @@ async def ping_wait(container_name, wait=9):
     # host = container_name if PRODUCTION else HYPER_FIP
     command = "ping -c 1 " + container_name  # + " >/dev/null 2>&1"
 
-    # command = 'ls -la sdfsdf'
-    print('num loops: %s' % num_loops)
+    _LOG.info('num loops: %s', num_loops)
 
-    for i in range(num_loops):  # wait up to 9 seconds
-        print('ping!')
+    for _ in range(num_loops):  # wait up to 9 seconds
+        _LOG.info('ping!')
         success, stdout, stderr = await sys_call_async(command)
 
         if success:
             return True
-        print('stdout: ' + stdout)
-        print('stderr: ' + stderr)
+        _LOG.info('stdout: ' + stdout)
+        _LOG.info('stderr: ' + stderr)
 
         await asyncio.sleep(0.35)
-    print('finished pinging without succeeding')
+    _LOG.info('finished pinging without succeeding')
     return False
+
+
+def get_host():
+    success, container_id, _ = sys_call('hostname')
+    if success is False or not container_id.strip():
+        _LOG.warning('Failed to get container_id. Try to generate id')
+        container_id = util.uuid(10)
+        _LOG.warning('No container_id found, generated id: %s', container_id)
+    return container_id.strip()

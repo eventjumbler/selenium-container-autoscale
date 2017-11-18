@@ -1,4 +1,4 @@
-from proxy.util import http_get, http_post, CAPABILITIES
+from proxy.util import CAPABILITIES
 
 
 NEW_SESSION_REQ_BODY = {
