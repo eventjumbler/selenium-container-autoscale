@@ -1,4 +1,4 @@
-FROM selenium/hub:3.6.0
+FROM selenium/hub:3.7.1
 LABEL authors="zero <sontt246@gmail.com>"
 
 USER root
@@ -12,6 +12,7 @@ RUN apt-get update --fix-missing \
 ENV HYPERSH_ACCESS_KEY ""
 ENV HYPERSH_SECRET ""
 ENV HYPERSH_REGION ""
+# Remove it after using all REST API of hyper
 RUN wget https://hyper-install.s3.amazonaws.com/hyper-linux-x86_64.tar.gz \
     && tar -xzf hyper-linux-x86_64.tar.gz -C /usr/bin/
 

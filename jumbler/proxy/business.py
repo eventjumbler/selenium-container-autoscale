@@ -7,7 +7,7 @@ import proxy.cmd_utils as cmd_utils
 import proxy.util as util
 from proxy.selenium import Selenium, Status
 
-from ..exception import ValidationError
+from exception import ValidationError, RequestError
 
 _LOG = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ class BusinessLogic(object):
         self.loop = asyncio_loop
         self.docker_client = HypershClient()
         self.proxy_container_id = cmd_utils.get_host()
-        self.proxy_container_ip = self.__get_docker_ip(self.proxy_container_id)
+        self.proxy_container_ip = self.__get_docker_container_ip(self.proxy_container_id)
         self.selenium = Selenium(self.loop, self.docker_client)
 
     async def start_node(self, browser, os_system):
@@ -46,5 +46,8 @@ class BusinessLogic(object):
         status = Status.NOT_AVAILABLE if not selenium_node_id else await self.verify_node_status(selenium_node_id)
         return status, selenium_node_id
 
-    def __get_docker_ip(self, container_id):
-        return self.docker_client.inspect_container(container_id)['NetworkSettings']['Networks']['IPAddress']
+    def __get_docker_container_ip(self, container_id):
+        status_code, resp = self.docker_client.inspect_container(container_id)
+        if not status_code:
+            raise RequestError('Failure to get docker internal ip')
+        return resp['NetworkSettings']['Networks']['IPAddress']

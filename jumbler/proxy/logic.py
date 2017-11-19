@@ -36,7 +36,7 @@ def create_container(app_logic, container_name):
 
 class AppLogic(object):
 
-    def __init__(self, asyncio_loop, proxy_container_id):
+    def __init__(self, asyncio_loop):
         self.loop = asyncio_loop
         self.leftover_drivers = []
         self.drivers = {}

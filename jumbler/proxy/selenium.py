@@ -4,7 +4,7 @@ from enum import Enum
 
 import proxy.rest_client as rest_client
 
-from ..exception import NotFoundError, RequestError
+from exception import NotFoundError, RequestError
 
 _DEFAULT_HUB_PORT = 4444
 _DEFAULT_NODE_PORT = 5555

@@ -36,6 +36,11 @@ loggers:
     handlers: [console, info_handler, debug_handler]
     propagate: no
 
+  hypersh-client:
+    level: DEBUG
+    handlers: [console, info_handler, debug_handler]
+    propagate: no
+
   hypersh:
     level: DEBUG
     handlers: [console, info_handler, debug_handler]
