@@ -7,7 +7,7 @@ import random
 import re
 import sys
 
-from hypersh_client.main.hypersh import HypershClient
+from dockerrest.hypersh import HypershClient
 from urllib3.exceptions import NewConnectionError
 
 import proxy.cmd_utils as cmd_utils
@@ -23,6 +23,8 @@ NEW_SESSION_REQ_BODY_STR = json.dumps(NEW_SESSION_REQ_BODY)
 MAX_DRIVERS_PER_CONTAINER = 3
 
 logger = logging.getLogger(__name__)
+
+# TODO: Deprecated
 
 
 def create_container(app_logic, container_name):

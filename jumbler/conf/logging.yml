@@ -36,12 +36,7 @@ loggers:
     handlers: [console, info_handler, debug_handler]
     propagate: no
 
-  hypersh-client:
-    level: DEBUG
-    handlers: [console, info_handler, debug_handler]
-    propagate: no
-
-  hypersh:
+  dockerrest:
     level: DEBUG
     handlers: [console, info_handler, debug_handler]
     propagate: no

@@ -1,9 +1,11 @@
+import argparse
 import logging
 import logging.config
 import os
 import sys
 import pprint
 import yaml
+from pkg_resources import get_distribution
 
 
 def __setup_logging(log_cfg_file='logging.yml', log_level=logging.INFO):
@@ -13,7 +15,7 @@ def __setup_logging(log_cfg_file='logging.yml', log_level=logging.INFO):
         with open(path, 'rt') as cfg_file:
             log_cfg = yaml.safe_load(cfg_file.read())
         for _, handler in log_cfg['handlers'].items():
-            file = handler.get("filename", None)
+            file = handler.get('filename', None)
             if file is None:
                 continue
             handler['filename'] = os.path.join(root, 'logs', file)
@@ -24,11 +26,29 @@ def __setup_logging(log_cfg_file='logging.yml', log_level=logging.INFO):
         return {}
 
 
-def main():
+def main(*arguments):
     sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+    # from email import message_from_string
+    # pkg_info = (arguments and arguments[0]) or message_from_string(get_distribution(__name__).get_metadata('PKG-INFO'))
+    # parser = argparse.ArgumentParser(usage=pkg_info['Description'])
+    # parser.add_argument('-v', '--version', action='version', version=pkg_info['Version'])
+    print(get_distribution(__name__))
+    parser = argparse.ArgumentParser(usage='Jumbler')
+    parser.add_argument('-v', '--version', action='version', version='1.0.0.dev1')
+    parser.add_argument('-H', '--host', action='store', default='0.0.0.0', help='Proxy Host Address. Default: \'0.0.0.0\'')
+    parser.add_argument('-p', '--port', action='store', default=5000, type=int, help='Proxy Host Port. Default: 5000')
+    parser.add_argument('-m', '--mode', action='store', default='hyper', choices=['docker', 'hyper'], help='Provider mode')
+    parser.add_argument('-ep', '--endpoint', action='store', default='', help='REST Endpoint for Provider. It\'s required in Docker Provider mode')
+    parser.add_argument('--debug', action='store', default=False, nargs='?', const=True, type=bool, help='Debug mode')
+    args = parser.parse_args()
+
+    server_cfg = {'host': args.host, 'port': args.port, 'debug': args.debug}
+    business_cfg = {'mode': args.mode, 'endpoint': args.endpoint}
+    print(server_cfg)
+    print(business_cfg)
     from server import SanicServer
-    server = SanicServer({'host': '0.0.0.0', 'port': 5000, 'debug': True}, __setup_logging())
+    server = SanicServer(server_cfg, business_cfg, __setup_logging())
     server.start()
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    main({'version': 'dev', 'description': ''})

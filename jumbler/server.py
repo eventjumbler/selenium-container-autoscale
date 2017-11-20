@@ -27,13 +27,13 @@ class SanicServer():
     QUIT_COMMAND = 2
     OTHER = 3
 
-    def __init__(self, server_cfg, log_cfg):
+    def __init__(self, server_cfg, business_cfg, log_cfg):
         self.server_cfg = server_cfg
         self.sanic_app = Sanic(__name__, log_config=log_cfg)
         self.server = self.sanic_app.create_server(**server_cfg)
         self.loop = asyncio.get_event_loop()
         self.app_logic = AppLogic(self.loop)
-        self.business_logic = BusinessLogic(self.loop)
+        self.business_logic = BusinessLogic(self.loop, business_cfg)
         self.__config()
 
     def start(self):

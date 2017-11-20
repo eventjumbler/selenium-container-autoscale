@@ -34,6 +34,9 @@ RUN pip3 install . --upgrade --process-dependency-links
 ADD startup.sh startup.sh
 RUN chmod a+x startup.sh
 # Need configuartion
+ENV PROXY_MODE ""
+ENV PROXY_SELENIUM_ENDPOINT ""
+ENV PROXY_DEBUG ""
 EXPOSE 5000
 
 ENTRYPOINT ["./startup.sh"]

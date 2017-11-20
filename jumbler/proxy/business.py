@@ -1,7 +1,7 @@
 import logging
 import re
 
-from hypersh_client.main.hypersh import HypershClient
+import dockerrest.docker_provider as docker_provider
 
 import proxy.cmd_utils as cmd_utils
 import proxy.util as util
@@ -14,9 +14,9 @@ _LOG = logging.getLogger(__name__)
 
 class BusinessLogic(object):
 
-    def __init__(self, asyncio_loop):
+    def __init__(self, asyncio_loop, business_cfg):
         self.loop = asyncio_loop
-        self.docker_client = HypershClient()
+        self.docker_client = docker_provider.factory(business_cfg.get('mode'), endpoint=business_cfg.get('endpoint'))
         self.proxy_container_id = cmd_utils.get_host()
         self.proxy_container_ip = self.__get_docker_container_ip(self.proxy_container_id)
         self.selenium = Selenium(self.loop, self.docker_client)
@@ -50,4 +50,4 @@ class BusinessLogic(object):
         status_code, resp = self.docker_client.inspect_container(container_id)
         if not status_code:
             raise RequestError('Failure to get docker internal ip')
-        return resp['NetworkSettings']['Networks']['IPAddress']
+        return resp['NetworkSettings']['Networks']['bridge']['IPAddress']

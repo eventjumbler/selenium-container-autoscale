@@ -1,25 +1,22 @@
 import asyncio
 import logging
-from asyncio.subprocess import PIPE
-from subprocess import Popen
+from subprocess import Popen, PIPE
 
 import proxy.util as util
 
 _LOG = logging.getLogger(__name__)
 
 async def sys_call_async(command):
-    proc = await asyncio.create_subprocess_exec(*command.split(), stdout=PIPE, stderr=PIPE)   # or loop.subprocess_exec?
+    proc = await asyncio.create_subprocess_exec(*command.split(), stdout=PIPE, stderr=PIPE)
     await proc.wait()
     stdout, stderr = await proc.communicate()
     success = proc.returncode == 0
     return success, stdout.decode(), stderr.decode()
 
 
-def sys_call(cmd_str, shell=False, suppress_errors=True):
-    p = Popen(cmd_str.split(), stdout=PIPE, stderr=PIPE, stdin=PIPE, shell=shell)  # stderr=PIPE,
-    # p.communicate()
-    stdout, stderr = p.stdout.read(), p.stderr.read()
-    p.wait()
+def sys_call(cmd_str, shell=False):
+    p = Popen(cmd_str.split(), stdout=PIPE, stderr=PIPE, stdin=PIPE, shell=shell, universal_newlines=True)
+    stdout, stderr = p.communicate()
     success = p.returncode == 0
     return success, stdout, stderr
 
