@@ -21,7 +21,8 @@ def main():
         base_url = 'http://' + NODE_IP + ':5555'
 
     time.sleep(8)
-    import pdb; pdb.set_trace()
+    import pdb
+    pdb.set_trace()
     driver = Remote(base_url + '/wd/hub', desired_capabilities=CAPABILITIES)
     driver.get('http://soas.ac.uk')
     links = driver.find_elements_by_xpath('//a')

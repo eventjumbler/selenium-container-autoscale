@@ -3,7 +3,6 @@ import logging
 from enum import Enum
 
 import proxy.rest_client as rest_client
-
 from exception import NotFoundError, RequestError
 
 _DEFAULT_HUB_PORT = 4444
@@ -43,11 +42,14 @@ class Selenium:
         env = copy.deepcopy(_DEFAULT_NODE_OPTION)
         env['SE_OPTS'] = '-id ' + selenium_node_id
         links = [hub_name + ':hub']
-        return self.docker_client.create_container(image, name=selenium_node_id, environment_variables=env, links=links)
+        status, container_id = self.docker_client.create_container(image, name=selenium_node_id, environment_variables=env, links=links)
+        if status:
+            return container_id
+        raise RequestError('Cannot create container')
 
-    def verify_node_status(self, hub_ip, selenium_node_id, hub_port=_DEFAULT_HUB_PORT):
+    async def verify_node_status(self, hub_ip, selenium_node_id, hub_port=_DEFAULT_HUB_PORT):
         json_data = {'id': selenium_node_id, 'isAlive': '', 'isDown': ''}
-        resp_code, response = rest_client.http_post(hub_ip + ':' + str(hub_port) + '/grid/api/proxy', json=json_data)
+        resp_code, response = await rest_client.http_post('http://%s:%d/grid/api/proxy' % (hub_ip, hub_port), json=json_data)
         if resp_code != 200:
             raise RequestError('Cannot connect to selenium hub')
         is_success = response['success']
@@ -59,7 +61,7 @@ class Selenium:
             return Status.OFF
         node_host = response['request']['configuration']['host']
         node_port = response['request']['configuration']['port'] or _DEFAULT_NODE_PORT
-        resp_code, response = rest_client.http_get(node_host + ':' + node_port + '/wd/hub/sessions')
+        resp_code, response = await rest_client.http_get('http://%s:%d/wd/hub/sessions' % (node_host, node_port))
         if resp_code != 200:
             raise RequestError('Cannot connect to selenium node %s in host %s, %s' % (selenium_node_id, node_host, node_port))
         # status = response['status']

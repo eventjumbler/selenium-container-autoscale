@@ -4,13 +4,15 @@ import re
 from signal import SIGINT, signal
 
 import proxy.cmd_utils as cmd_utils
-from exception import BusinessError, ValidationError
+from exception import (BusinessError, ExecutionError, NotFoundError,
+                       RequestError, ValidationError)
 from proxy.business import BusinessLogic
 from proxy.driver_responses import quit_response
 from proxy.logic import AppLogic
 from proxy.util import get_session_id, uuid
 from sanic import Sanic
-from sanic.exceptions import InvalidUsage, ServerError
+from sanic.exceptions import InvalidUsage, ServerError, NotFound
+from sanic.handlers import ErrorHandler
 from sanic.response import json as json_resp
 from sanic.response import text as text_resp
 
@@ -56,7 +58,13 @@ class SanicServer():
         self.sanic_app.add_route(self.__notify_node_shutdown, '/container/<container_name:[A-z0-9_]{7,15}>', methods=['DELETE'])
         self.sanic_app.add_route(self.__query_driver, '/driver/<driver_url:path>', methods=['GET', 'POST', 'DELETE'])
         self.sanic_app.add_route(self.__start_node, '/node', methods=['POST'])
-        self.sanic_app.add_route(self.__check_node_status, '/node/<node_name:[A-z0-9_]{7,15}>/status', methods=['GET'])
+        self.sanic_app.add_route(self.__check_node_status, '/node/<node_name:[A-z0-9_]{5,25}>/status', methods=['GET'])
+        error_handler = ErrorHandler()
+        error_handler.add(ValidationError, self.__handle_exception)
+        error_handler.add(ExecutionError, self.__handle_exception)
+        error_handler.add(RequestError, self.__handle_exception)
+        error_handler.add(BusinessError, self.__handle_exception)
+        self.sanic_app.error_handler = error_handler
 
     def __driver_request_type(self, driver_url, method):
         if method == 'POST' and driver_url == 'wd/hub/session':
@@ -70,7 +78,7 @@ class SanicServer():
 
     async def __test_view(self, request):
         _LOG.info(request)
-        return text_resp('success!')
+        return json_resp('success!')
 
     async def __shutdown_nodes(self, request):
         self.app_logic.shutdown_nodes()
@@ -98,25 +106,23 @@ class SanicServer():
         return await self.app_logic.proxy_selenium_request(request, driver_url)
 
     async def __start_node(self, request):
-        _LOG.info('Start node')
-        browser = request.form.get('browser') if request.form else request.json['browser'] or 'firefox'
-        os_system = request.form.get('os') if request.form else request.json['os'] or 'unix'
+        browser = request.form.get('browser') if request.form else request.json.get('browser') or 'firefox'
+        os_system = request.form.get('os') if request.form else request.json.get('os') or 'unix'
         if not re.compile(r'(?i)^(chrome|ie|edge|safari|firefox|phantomjs|opera)$').match(browser):
             raise InvalidUsage('Browser is not support')
         if not re.compile(r'(?i)^(unix|linux|windows|win)$').match(os_system):
             raise InvalidUsage('OS system is not support')
-        _LOG.info(browser)
-        _LOG.info(os_system)
-        try:
-            return await json_resp(self.business_logic.start_node(browser.lower(), os_system), status=200)
-        except ValidationError as ve:
-            raise InvalidUsage(ve.message)
-        except BusinessError as be:
-            raise ServerError(be.message)
+        return json_resp(await self.business_logic.start_node(browser.lower(), os_system), status=200)
 
     async def __check_node_status(self, request, node_name):
         _LOG.info('Check node %s status', node_name)
-        try:
-            return await json_resp(self.business_logic.verify_node_status(node_name), status=200)
-        except BusinessError as be:
-            raise ServerError(be.message)
+        return json_resp(await self.business_logic.verify_node_status(node_name), status=200)
+
+    def __handle_exception(self, request, exception):
+        if isinstance(ValidationError, exception):
+            raise InvalidUsage(exception.message)
+        if isinstance(RequestError, exception) or isinstance(NotFoundError, exception):
+            raise NotFound(exception.message)
+        if isinstance(ExecutionError, exception) or isinstance(BusinessError, exception):
+            raise ServerError(exception.message)
+        raise ServerError(exception)

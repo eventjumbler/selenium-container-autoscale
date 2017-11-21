@@ -20,7 +20,8 @@ def get_attribute_request_json(session_id, elem_key, elem_id):
 
 
 def exit_error(str):
-    import pdb; pdb.set_trace()
+    import pdb
+    pdb.set_trace()
     exit(str)
 
 
@@ -35,7 +36,7 @@ def main():
         setup_proxy_mode()
         base_url = 'http://' + PROXY_IP + ':5000/driver'
     else:
-        #setup_node_mode()
+        # setup_node_mode()
         base_url = 'http://' + NODE_IP + ':5555'
 
     time.sleep(6)
@@ -47,7 +48,7 @@ def main():
     resp_dict = json.loads(resp.content.decode())
     session_id = resp_dict['sessionId'] if 'sessionId' in resp_dict else resp_dict['value']['sessionId']  # for some reason it's different sometimes?
 
-    resp = requests.post(base_url + '/wd/hub/session/' + session_id + '/url', json={"url": "http://soas.ac.uk",  "sessionId": session_id})
+    resp = requests.post(base_url + '/wd/hub/session/' + session_id + '/url', json={"url": "http://soas.ac.uk", "sessionId": session_id})
     if resp.status_code != 200:
         exit_error('failed to load url')
 
@@ -71,7 +72,6 @@ def main():
     resp = requests.delete(base_url + '/wd/hub/session/' + session_id)
     if resp.status_code != 200:
         exit_error('failed to quit browser')
-
 
 
 if __name__ == "__main__":

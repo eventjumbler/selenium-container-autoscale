@@ -38,7 +38,7 @@ class ExistingError(BusinessError):
 
 
 class RequestError(BusinessError):
-    ''' Request error from REST-API '''
+    ''' Request error from REST-API of 3rd party '''
 
     def __init__(self, message='', ex=None, level=logging.DEBUG):
         super(RequestError, self).__init__(message, ex, level)

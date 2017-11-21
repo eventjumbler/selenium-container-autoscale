@@ -15,7 +15,6 @@ async def http_get(url, params=None, session=None):
     async with aiohttp.ClientSession() as session:
         return await do_get(session)
 
-
 async def http_post(url, data=None, json=None, session=None):
     async def do_post(sess):
         async with sess.post(url, data=data, json=json) as resp:
