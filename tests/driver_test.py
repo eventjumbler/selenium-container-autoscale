@@ -14,20 +14,20 @@ def main():
     is_proxy = sys.argv[1] == 'proxy'
 
     if is_proxy:
-        setup_proxy_mode()
+        #setup_proxy_mode()
         base_url = 'http://' + PROXY_IP + ':5000/driver'
     else:
-        setup_node_mode()
+        #setup_node_mode()
         base_url = 'http://' + NODE_IP + ':5555'
 
-    time.sleep(8)
-    import pdb; pdb.set_trace()
+    time.sleep(7)
+
     driver = Remote(base_url + '/wd/hub', desired_capabilities=CAPABILITIES)
     driver.get('http://soas.ac.uk')
     links = driver.find_elements_by_xpath('//a')
     curr_link = links[1]
     outer_html = curr_link.get_attribute('outerHTML')
-
+    import pdb; pdb.set_trace()
     print('result:')
     print(outer_html)
 

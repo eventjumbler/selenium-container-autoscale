@@ -20,7 +20,7 @@ class SeleniumClient(object):
         self.loop = loop
         self.req_sessions = {}
 
-    def get_req_session(self, container):
+    async def get_req_session(self, container):
         if container not in self.req_sessions:
             self.req_sessions[container] = aiohttp.ClientSession()
         return self.req_sessions[container]
@@ -48,7 +48,7 @@ class SeleniumClient(object):
         try:
             status, resp_json = await http_get(
                 base_url(container) + '/wd/hub/sessions',
-                session=self.get_req_session(container)
+                session=(await self.get_req_session(container))
             )
         except:
             return False, None, None
@@ -90,7 +90,7 @@ class SeleniumClient(object):
 
         status_code, resp_json = await http_post(
             url, json={'sessionId': selenium_sess_id, 'url': url},
-            session=self.get_req_session(container)
+            session=(await self.get_req_session(container))
         )
 
         if status_code not in (200, 201, 204):
