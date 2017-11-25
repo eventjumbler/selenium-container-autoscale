@@ -28,17 +28,18 @@ def __setup_logging(log_cfg_file='logging.yml', log_level=logging.INFO):
 
 def main(*arguments):
     sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+    # print(get_distribution(__name__).get_metadata('PKG-INFO'))
     # from email import message_from_string
     # pkg_info = (arguments and arguments[0]) or message_from_string(get_distribution(__name__).get_metadata('PKG-INFO'))
     # parser = argparse.ArgumentParser(usage=pkg_info['Description'])
     # parser.add_argument('-v', '--version', action='version', version=pkg_info['Version'])
-    print(get_distribution(__name__))
-    parser = argparse.ArgumentParser(usage='Jumbler')
+    parser = argparse.ArgumentParser(usage='Jumbler', allow_abbrev=False)
     parser.add_argument('-v', '--version', action='version', version='1.0.0.dev1')
-    parser.add_argument('-H', '--host', action='store', default='0.0.0.0', help='Proxy Host Address. Default: \'0.0.0.0\'')
-    parser.add_argument('-p', '--port', action='store', default=5000, type=int, help='Proxy Host Port. Default: 5000')
-    parser.add_argument('-m', '--mode', action='store', default='hyper', choices=['docker', 'hyper'], help='Provider mode')
-    parser.add_argument('-ep', '--endpoint', action='store', default='', help='REST Endpoint for Provider. It\'s required in Docker Provider mode')
+    parser.add_argument('-H', '--host', action='store', default='0.0.0.0', required=False, help='Proxy Host Address. Default: \'0.0.0.0\'')
+    parser.add_argument('-p', '--port', action='store', default=5000, type=int, required=False, help='Proxy Host Port. Default: 5000')
+    parser.add_argument('-m', '--mode', action='store', default='hypersh', required=False, choices=['docker', 'hypersh'], help='Provider mode')
+    parser.add_argument('-ep', '--endpoint', action='store', default='', required=False,
+                        help='Provider REST Endpoint. It\'s required in Docker Provider mode')
     parser.add_argument('--debug', action='store', default=False, nargs='?', const=True, type=bool, help='Debug mode')
     args = parser.parse_args()
 

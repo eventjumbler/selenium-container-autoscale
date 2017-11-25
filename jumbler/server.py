@@ -57,8 +57,9 @@ class SanicServer():
         self.sanic_app.add_route(self.__shutdown_nodes, '/shutdown_nodes/', methods=['POST'])
         self.sanic_app.add_route(self.__notify_node_shutdown, '/container/<container_name:[A-z0-9_]{7,15}>', methods=['DELETE'])
         self.sanic_app.add_route(self.__query_driver, '/driver/<driver_url:path>', methods=['GET', 'POST', 'DELETE'])
-        self.sanic_app.add_route(self.__start_node, '/node', methods=['POST'])
+        self.sanic_app.add_route(self.__start_node_container, '/node', methods=['POST'])
         self.sanic_app.add_route(self.__check_node_status, '/node/<node_name:[A-z0-9_]{5,25}>/status', methods=['GET'])
+        self.sanic_app.add_route(self.__request_selenium_node, '/node/<driver_url:path>', methods=['POST'])
         error_handler = ErrorHandler()
         error_handler.add(ValidationError, self.__handle_exception)
         error_handler.add(ExecutionError, self.__handle_exception)
@@ -105,24 +106,27 @@ class SanicServer():
             return quit_response(selenium_id)
         return await self.app_logic.proxy_selenium_request(request, driver_url)
 
-    async def __start_node(self, request):
-        browser = request.form.get('browser') if request.form else request.json.get('browser') or 'firefox'
-        os_system = request.form.get('os') if request.form else request.json.get('os') or 'unix'
-        if not re.compile(r'(?i)^(chrome|ie|edge|safari|firefox|phantomjs|opera)$').match(browser):
-            raise InvalidUsage('Browser is not support')
-        if not re.compile(r'(?i)^(unix|linux|windows|win)$').match(os_system):
-            raise InvalidUsage('OS system is not support')
-        return json_resp(await self.business_logic.start_node(browser.lower(), os_system), status=200)
+    async def __request_selenium_node(self, request, driver_url):
+        _LOG.info(driver_url)
+        _LOG.info(request.json)
+        if '//' in driver_url:
+            driver_url = driver_url.replace('//', '/')
+        return json_resp(await self.business_logic.start_selenium_node(request.json), status=200)
+
+    async def __start_node_container(self, request):
+        browser = request.form.get('browser') if request.form else request.json.get('browser')
+        os_system = request.form.get('os') if request.form else request.json.get('os')
+        return json_resp(await self.business_logic.create_node_container(browser, os_system), status=200)
 
     async def __check_node_status(self, request, node_name):
         _LOG.info('Check node %s status', node_name)
         return json_resp(await self.business_logic.verify_node_status(node_name), status=200)
 
     def __handle_exception(self, request, exception):
-        if isinstance(ValidationError, exception):
+        if isinstance(exception, ValidationError):
             raise InvalidUsage(exception.message)
-        if isinstance(RequestError, exception) or isinstance(NotFoundError, exception):
+        if isinstance(exception, RequestError) or isinstance(exception, NotFoundError):
             raise NotFound(exception.message)
-        if isinstance(ExecutionError, exception) or isinstance(BusinessError, exception):
+        if isinstance(exception, ExecutionError) or isinstance(exception, BusinessError):
             raise ServerError(exception.message)
         raise ServerError(exception)
