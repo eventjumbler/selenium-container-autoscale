@@ -40,11 +40,13 @@ def main(*arguments):
     parser.add_argument('-m', '--mode', action='store', default='hypersh', required=False, choices=['docker', 'hypersh'], help='Provider mode')
     parser.add_argument('-ep', '--endpoint', action='store', default='', required=False,
                         help='Provider REST Endpoint. It\'s required in Docker Provider mode')
+    parser.add_argument('-r', '--retry', action='store', type=int, default=5, required=False, help='Retry calling action')
+    parser.add_argument('-i', '--interval', action='store', type=float, default=1, required=False, help='Interval calling action in seconds')
     parser.add_argument('--debug', action='store', default=False, nargs='?', const=True, type=bool, help='Debug mode')
     args = parser.parse_args()
 
     server_cfg = {'host': args.host, 'port': args.port, 'debug': args.debug}
-    business_cfg = {'mode': args.mode, 'endpoint': args.endpoint}
+    business_cfg = {'mode': args.mode, 'endpoint': args.endpoint, 'retry': args.retry, 'interval': args.interval}
     print(server_cfg)
     print(business_cfg)
     from server import SanicServer

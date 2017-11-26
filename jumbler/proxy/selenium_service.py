@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import logging
 from enum import Enum
@@ -5,6 +6,8 @@ from enum import Enum
 import proxy.rest_client as rest_client
 from exception import NotFoundError, RequestError
 
+_DEFAULT_BROWSER = 'firefox'
+_DEFAULT_PLATFORM = 'LINUX'
 _DEFAULT_HUB_PORT = 4444
 _DEFAULT_NODE_PORT = 5555
 _DEFAULT_NODE_OPTION = {
@@ -22,60 +25,118 @@ _IMAGES = {
 _LOG = logging.getLogger(__name__)
 
 
-class Status(Enum):
+class State(Enum):
+    '''
+    Represents for Selenium Grid Node state
+    '''
     RUNNING = 1
     PENDING = 2
     OFF = 3
     NOT_AVAILABLE = 4
+    UNKNOWN = 5
 
 
 class SeleniumService:
+    '''
+    Selenium service interacts with Selenium Grid Hub or Selenium Grid Node via REST API or plain HTTP endpoint
+    '''
 
-    def __init__(self, loop, docker_client):
+    def __init__(self, loop, retry=5, interval=1):
         self.loop = loop
-        self.docker_client = docker_client
+        self.retry = retry
+        self.interval = interval
 
-    async def start_node(self, hub_ip, capabilities, hub_port=_DEFAULT_HUB_PORT):
-        resp_code, response = await rest_client.http_post('http://%s:%d/wd/hub' % (hub_ip, hub_port), json=capabilities)
+    def find_nodes(self, hub_name, hub_ip, hub_port=_DEFAULT_HUB_PORT):
+        # TODO: implement
+        return []
+
+    async def start_node(self, hub_ip, selenium_node_id, capabilities, hub_port=_DEFAULT_HUB_PORT):
+        '''
+        Execute business by starting Selenium Grid Node with `capabilities` by connect to `<hup_ip>:<hub_port>/wd/hub/session`
+
+        :Args:
+        hub_ip: Selenium Grid Hub internal IP in Docker network to request connection
+        hub_port: Selenium Grid Hub Port. Default: `4444`
+        capabilities: Selenium Grid Node capabilities. To specific which node for execution, must define `applicationName`
+
+        :Returns:
+        response: Selenium response when request new Grid Node session
+        '''
+        state = State.UNKNOWN
+        for _ in range(self.retry):
+            try:
+                state = await self.verify_node_status(hub_ip, selenium_node_id)
+                if state is State.PENDING:
+                    break
+            except RequestError:
+                pass
+            await asyncio.sleep(self.interval)
+        if state is not State.PENDING:
+            raise RequestError('Selenium Node is in %s. Failure to start Selenium Node %s' % (state, selenium_node_id))
+        url = 'http://%s:%d/wd/hub/session' % (hub_ip, hub_port)
+        resp_code, response = await rest_client.http_post(url, json=capabilities)
         if resp_code != 200:
-            raise RequestError('Cannot connect to selenium hub in host %s:%d' % (hub_ip, hub_port))
+            raise RequestError('Failure communication with Selenium Hub in %s' % url)
         return response
 
     def create_node(self, hub_name, browser, selenium_node_id, image=None, tag=None):
-        image = _IMAGES[browser.lower()].get('image') if not image else image
-        tag = _IMAGES[browser.lower()].get('tag') if not tag else tag
+        '''
+        Create new Docker container for Selenium Grid Node.\n
+        If Docker image of Selenium Grid Node not found in current system, it will try to pull image firstly
+
+        :Args:
+        hub_name: Selenium Grid Hub name to link from new Selenium Grid node
+        browser: Request browser for execution
+        selenium_node_id: Uses for container name, Selenium Grid node id and `applicationName` in capabilities
+        image: Customize image name
+        tag: Customize image tag
+
+        :Returns:
+        node_info: Selenium Node information that uses when creating new Docker container
+        '''
+        browser = browser.lower()
+        image = _IMAGES[browser].get('image') if not image else image
+        tag = _IMAGES[browser].get('tag') if not tag else tag
         if not image:
             raise NotFoundError('Docker image for browser %s is not available' % browser)
         full_image = '%s:%s' % (image, tag)
-        if not self.docker_client.pull_image(image, tag):
-            raise RequestError('Cannot pull image %s', full_image)
         env = copy.deepcopy(_DEFAULT_NODE_OPTION)
         env['SE_OPTS'] = '-id ' + selenium_node_id
+        env['NODE_APPLICATION_NAME'] = selenium_node_id
         links = [hub_name + ':hub']
-        status, container_id = self.docker_client.create_container(full_image, name=selenium_node_id, environment_variables=env, links=links)
-        if status:
-            return container_id
-        raise RequestError('Cannot create container')
+        return {'full_image': full_image, 'image': image, 'tag': tag, 'name': selenium_node_id, 'env': env, 'links': links}
 
     async def verify_node_status(self, hub_ip, selenium_node_id, hub_port=_DEFAULT_HUB_PORT):
+        '''
+        Check Selenium Grid Node status.
+
+        :Args:
+        hub_ip: Selenium Grid Hub internal IP in Docker network to request connection
+        hub_port: Selenium Grid Hub Port. Default: `4444`
+        selenium_node_id: Selenium Grid Node id to check
+
+        :Returns:
+        status: Selenium Grid Node status :cls:`<selenium_service.Status>`
+        '''
         json_data = {'id': selenium_node_id, 'isAlive': '', 'isDown': ''}
         resp_code, response = await rest_client.http_post('http://%s:%d/grid/api/proxy' % (hub_ip, hub_port), json=json_data)
         if resp_code != 200:
-            raise RequestError('Cannot connect to selenium hub')
-        is_success = response['success']
-        is_alive = response['isAlive']
-        is_down = response['isDown']
+            raise RequestError('Cannot connect to Selenium Hub to retrieve Selenium Node information')
+        is_success = response.get('success')
+        is_alive = response.get('isAlive')
+        is_down = response.get('isDown')
         if not is_success:
-            raise RequestError('Failure when communicate with selenium hub')
+            raise RequestError('Failure communication with Selenium Hub')
         if not is_alive or is_down:
-            return Status.OFF
+            return State.OFF
         node_host = response['request']['configuration']['host']
         node_port = int(response['request']['configuration']['port'] or _DEFAULT_NODE_PORT)
-        resp_code, response = await rest_client.http_get('http://%s:%d/wd/hub/sessions' % (node_host, node_port))
+        selenium_node_url = 'http://%s:%d/wd/hub/sessions' % (node_host, node_port)
+        resp_code, response = await rest_client.http_get(selenium_node_url)
         if resp_code != 200:
-            raise RequestError('Cannot connect to selenium node %s in host %s:%d' % (selenium_node_id, node_host, node_port))
+            raise RequestError('Failure communication with Selenium Node %s in %s' % (selenium_node_id, selenium_node_url))
         # status = response['status']
-        value = response['value']
+        value = response.get('value')
         if value:
-            return Status.RUNNING
-        return Status.PENDING
+            return State.RUNNING
+        return State.PENDING
