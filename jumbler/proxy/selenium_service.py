@@ -1,4 +1,4 @@
-import asyncio
+import time
 import copy
 import logging
 from enum import Enum
@@ -50,6 +50,9 @@ class SeleniumService:
         # TODO: implement
         return []
 
+    def generate_hub_url(self, hub_ip, path, hub_port=_DEFAULT_HUB_PORT):
+        return 'http://%s:%s/wd/hub/%s' % (hub_ip, hub_port, path)
+
     async def start_node(self, hub_ip, selenium_node_id, capabilities, hub_port=_DEFAULT_HUB_PORT):
         '''
         Execute business by starting Selenium Grid Node with `capabilities` by connect to `<hup_ip>:<hub_port>/wd/hub/session`
@@ -63,20 +66,20 @@ class SeleniumService:
         response: Selenium response when request new Grid Node session
         '''
         state = State.UNKNOWN
-        for _ in range(self.retry):
+        for count in range(self.retry):
             try:
                 state = await self.verify_node_status(hub_ip, selenium_node_id)
                 if state is State.PENDING:
                     break
             except RequestError:
-                pass
-            await asyncio.sleep(self.interval)
+                _LOG.debug('Verify Node status #%d', count)
+            time.sleep(self.interval)
         if state is not State.PENDING:
             raise RequestError('Selenium Node is in %s. Failure to start Selenium Node %s' % (state, selenium_node_id))
-        url = 'http://%s:%d/wd/hub/session' % (hub_ip, hub_port)
+        url = self.generate_hub_url(hub_ip, 'session', hub_port)
         resp_code, response = await rest_client.http_post(url, json=capabilities)
         if resp_code != 200:
-            raise RequestError('Failure communication with Selenium Hub in %s' % url)
+            raise RequestError('Failure communication with Selenium Hub in %s. Response: %s' % (url, response))
         return response
 
     def create_node(self, hub_name, browser, selenium_node_id, image=None, tag=None):
@@ -116,7 +119,7 @@ class SeleniumService:
         selenium_node_id: Selenium Grid Node id to check
 
         :Returns:
-        status: Selenium Grid Node status :cls:`<selenium_service.Status>`
+        state: Selenium Grid Node status :cls:`<selenium_service.State>`
         '''
         json_data = {'id': selenium_node_id, 'isAlive': '', 'isDown': ''}
         resp_code, response = await rest_client.http_post('http://%s:%d/grid/api/proxy' % (hub_ip, hub_port), json=json_data)
@@ -126,15 +129,15 @@ class SeleniumService:
         is_alive = response.get('isAlive')
         is_down = response.get('isDown')
         if not is_success:
-            raise RequestError('Failure communication with Selenium Hub')
+            raise RequestError('Failure communication with Selenium Hub. Response: %s' % response)
         if not is_alive or is_down:
             return State.OFF
         node_host = response['request']['configuration']['host']
         node_port = int(response['request']['configuration']['port'] or _DEFAULT_NODE_PORT)
-        selenium_node_url = 'http://%s:%d/wd/hub/sessions' % (node_host, node_port)
+        selenium_node_url = self.generate_hub_url(node_host, 'sessions', node_port)
         resp_code, response = await rest_client.http_get(selenium_node_url)
         if resp_code != 200:
-            raise RequestError('Failure communication with Selenium Node %s in %s' % (selenium_node_id, selenium_node_url))
+            raise RequestError('Failure communication with Selenium Node %s in %s. Response: %s' % (selenium_node_id, selenium_node_url, response))
         # status = response['status']
         value = response.get('value')
         if value:

@@ -1,9 +1,11 @@
 import logging
 import re
+import time
 
 import dockerrest.docker_provider as docker_provider
 
 import proxy.cmd_utils as cmd_utils
+import proxy.rest_client as rest_client
 import proxy.util as util
 from exception import (ExecutionError, NotFoundError, RequestError,
                        ValidationError)
@@ -20,10 +22,12 @@ class BusinessLogic(object):
 
     def __init__(self, asyncio_loop, business_cfg):
         self.loop = asyncio_loop
+        self.retry = business_cfg.get('retry')
+        self.interval = business_cfg.get('interval')
         self.docker_client = docker_provider.factory(business_cfg.get('mode'), endpoint=business_cfg.get('endpoint'))
         self.proxy_container_id = cmd_utils.get_host()
         self.proxy_container_ip = self.__get_docker_container_ip(self.proxy_container_id)
-        self.selenium = SeleniumService(self.loop, business_cfg.get('retry'), business_cfg.get('interval'))
+        self.selenium = SeleniumService(self.loop, self.retry, self.interval)
         self.database = DatabaseService(self.loop)
 
     async def create_node_container(self, browser, os_system):
@@ -37,7 +41,7 @@ class BusinessLogic(object):
         :Returns:
         result: A dict mapping node name and its information. For example:
         `{'browser': 'chrome', 'os': 'LINUX', 'container_id': 'b870855c27f47fed29334b8776617837c3f71392ec2bafd1437c2f88aa52d4ba',
-        'selenium_node_id': 'chrome_ce3adcddcf'}`
+        'selenium_node_id': 'chrome-ce3adcddcf'}`
         '''
         _LOG.info('Register new container Browser: %s - OS: %s', browser, os_system)
         browser, os_system = self.__validate_request_node(browser, os_system)
@@ -46,7 +50,7 @@ class BusinessLogic(object):
         result = {'browser': browser, 'os': os_system, 'container_id': container_id, 'selenium_node_id': selenium_node_id}
         if status in (State.NOT_AVAILABLE, State.RUNNING):
             # Create new selenium node with browser and generated id
-            result['selenium_node_id'] = browser + '_' + util.uuid(10)
+            result['selenium_node_id'] = browser + '-' + util.uuid(10)
             container_info = self.selenium.create_node(self.proxy_container_id, browser, result.get('selenium_node_id'))
             if not self.docker_client.pull_image(container_info.get('image'), container_info.get('tag')):
                 raise RequestError('Cannot pull image %s', container_info.get('full_image'))
@@ -63,7 +67,7 @@ class BusinessLogic(object):
             pass
         else:
             raise ExecutionError('Not handle status: %s', str(status))
-        self.database.persist_node(result, status)
+        await self.database.persist_node(result, status)
         return result
 
     async def start_selenium_node(self, capabilities):
@@ -84,7 +88,7 @@ class BusinessLogic(object):
         selenium_node_id = result.get('selenium_node_id')
         capabilities['desiredCapabilities']['applicationName'] = selenium_node_id
         response = await self.selenium.start_node(self.proxy_container_ip, selenium_node_id, capabilities)
-        self.database.update_node_state(selenium_node_id, State.RUNNING)
+        await self.database.update_node_state(selenium_node_id, State.RUNNING)
         return response
 
     async def verify_node_status(self, selenium_node_id):
@@ -122,7 +126,17 @@ class BusinessLogic(object):
         '''
         node_ids = self.selenium.find_nodes(hub_name)
         # self.docker_client.stop_container(node_ids)
-        self.database.remove_node(node_ids)
+        await self.database.remove_node(node_ids)
+
+    async def forward_request(self, request, driver_url):
+        url = self.selenium.generate_hub_url(self.proxy_container_ip, driver_url)
+        if request.method == 'POST':
+            return await rest_client.http_post(url, data=request.body)
+        elif request.method == 'GET':
+            return await rest_client.http_get(url, params=dict(request.args))
+        elif request.method == 'DELETE':
+            return await rest_client.http_delete(url)
+        raise Exception('unexpected http method: ' + request.method)
 
     def __validate_request_node(self, browser, os_system):
         #  TODO: For future
@@ -143,7 +157,12 @@ class BusinessLogic(object):
         return state, container_id, selenium_node_id
 
     def __get_docker_container_ip(self, container_id):
-        status_code, resp = self.docker_client.inspect_container(container_id)
-        if not status_code:
-            raise RequestError('Failure to get docker internal ip')
-        return resp['NetworkSettings']['Networks']['bridge']['IPAddress']
+        for count in range(self.retry):
+            try:
+                status_code, resp = self.docker_client.inspect_container(container_id)
+                if status_code:
+                    return resp['NetworkSettings']['Networks']['bridge']['IPAddress']
+            except RequestError:
+                _LOG.debug('Get Docker container %s internal IP #%d', container_id, count)
+            time.sleep(self.interval)
+        raise RequestError('Failure to get docker internal ip')

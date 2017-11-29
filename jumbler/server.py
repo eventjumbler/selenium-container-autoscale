@@ -11,7 +11,7 @@ from proxy.driver_responses import quit_response
 from proxy.logic import AppLogic
 from proxy.util import get_session_id, uuid
 from sanic import Sanic
-from sanic.exceptions import InvalidUsage, ServerError, NotFound
+from sanic.exceptions import InvalidUsage, NotFound, ServerError
 from sanic.handlers import ErrorHandler
 from sanic.response import json as json_resp
 from sanic.response import text as text_resp
@@ -59,7 +59,7 @@ class SanicServer():
         self.sanic_app.add_route(self.__query_driver, '/driver/<driver_url:path>', methods=['GET', 'POST', 'DELETE'])
         self.sanic_app.add_route(self.__start_node_container, '/node', methods=['POST'])
         self.sanic_app.add_route(self.__check_node_status, '/node/<node_name:[A-z0-9_]{5,25}>/status', methods=['GET'])
-        self.sanic_app.add_route(self.__request_selenium_node, '/node/<driver_url:path>', methods=['POST'])
+        self.sanic_app.add_route(self.__request_selenium_node, '/node/wd/hub/<driver_url:path>', methods=['GET', 'POST', 'DELETE'])
         error_handler = ErrorHandler()
         error_handler.add(ValidationError, self.__handle_exception)
         error_handler.add(ExecutionError, self.__handle_exception)
@@ -108,10 +108,13 @@ class SanicServer():
 
     async def __request_selenium_node(self, request, driver_url):
         _LOG.info(driver_url)
-        _LOG.info(request.json)
+        _LOG.debug(request.json)
         if '//' in driver_url:
             driver_url = driver_url.replace('//', '/')
-        return json_resp(await self.business_logic.start_selenium_node(request.json), status=200)
+        if request.method == 'POST' and driver_url == 'session':
+            return json_resp(await self.business_logic.start_selenium_node(request.json), status=200)
+        status_code, resp = await self.business_logic.forward_request(request, driver_url)
+        return json_resp(resp, status=status_code)
 
     async def __start_node_container(self, request):
         browser = request.form.get('browser') if request.form else request.json.get('browser')

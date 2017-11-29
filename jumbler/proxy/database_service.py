@@ -18,3 +18,6 @@ class DatabaseService(object):
 
     async def persist_node(self, node_info, prev_state):
         pass
+
+    async def remove_node(self, node_id):
+        pass

@@ -125,7 +125,7 @@ class AppLogic(object):
 
     async def _wait_for_selenium_ready(self, container_name, wait_time=12):
         """ Wait for selenium to initialise and respond to requests. """
-        logger.info('waiting for selenium to be ready, will retry get_active_sessions() for %s seconds' % wait_time)
+        logger.info('waiting for selenium to be ready, will retry get_active_sessions() for %s seconds', wait_time)
 
         if (await self.ping_container(container_name)) is False:
             logger.warning('_wait_for_selenium_ready() called on container that seems offline (ping failed)')
@@ -143,26 +143,26 @@ class AppLogic(object):
 
             await asyncio.sleep(0.5)
 
-        logger.warning('selenium failed to be ready on %s after %s seconds' % (container_name, wait_time))
+        logger.warning('selenium failed to be ready on %s after %s seconds', container_name, wait_time)
         return False
 
     async def _launch_container(self):
         container_name = 'seleniumnode' + uuid(10)
 
-        logger.info('creating and starting container: %s from image: %s' % (container_name, NODE_IMAGE))
+        logger.info('creating and starting container: %s from image: %s', container_name, NODE_IMAGE)
 
         success, container_id = await self.loop.run_in_executor(
             None, create_container, self, container_name
         )
 
         if not success:
-            logger.error('error: problem when launching container')
+            logger.error('problem when launching container')
             return False, None
 
         logger.info('pinging new container repeatedly for 22s to wait for launch')
         success = await cmd_utils.ping_wait(container_name, wait=22)
         if not success:
-            logger.error('error: ping_wait for new container failed after 16 seconds pinging')
+            logger.error('ping_wait for new container failed after 16 seconds pinging')
             return False, None
 
         logger.info('successfully launched container: ' + container_name)
@@ -219,7 +219,7 @@ class AppLogic(object):
         if not self.leftover_drivers:
             return None
 
-        logger.info('find_leftover() called, leftovers: %s' % self.leftover_drivers)
+        logger.info('find_leftover() called, leftovers: %s', self.leftover_drivers)
 
         active_sessions = {}
 
@@ -257,7 +257,7 @@ class AppLogic(object):
             request, request_session, url
         )
         if status_code != 200:
-            print('warning: selenium request gave status: %s' % status_code)
+            logger.warning('selenium request gave status: %s', status_code)
 
         return json_resp(resp_json, status=status_code)
         # return HTTPResponse(resp.content.decode(), status=resp.status_code, content_type="application/json")
