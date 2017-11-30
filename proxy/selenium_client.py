@@ -4,6 +4,7 @@ import sys
 import aiohttp
 
 from proxy.util import http_get, http_post
+import json
 
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
@@ -86,10 +87,10 @@ class SeleniumClient(object):
 
     async def get_page(self, container, selenium_sess_id, url):
 
-        url = 'http://'+container+':5555'+('/wd/hub/session/%s/url' % selenium_sess_id)
+        req_url = 'http://'+container+':5555'+('/wd/hub/session/%s/url' % selenium_sess_id)
 
         status_code, resp_json = await http_post(
-            url, json={'sessionId': selenium_sess_id, 'url': url},
+            req_url, json={'sessionId': selenium_sess_id, 'url': url},
             session=(await self.get_req_session(container))
         )
 
