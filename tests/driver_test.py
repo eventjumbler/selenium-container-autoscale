@@ -14,10 +14,10 @@ def main():
     is_proxy = sys.argv[1] == 'proxy'
 
     if is_proxy:
-        #setup_proxy_mode()
+        setup_proxy_mode()
         base_url = 'http://' + PROXY_IP + ':5000/driver'
     else:
-        #setup_node_mode()
+        setup_node_mode()
         base_url = 'http://' + NODE_IP + ':5555'
 
     time.sleep(7)
