@@ -20,7 +20,7 @@ def main():
         setup_node_mode()
         base_url = 'http://' + NODE_IP + ':5555'
 
-    time.sleep(8)
+    time.sleep(7)
     import pdb
     pdb.set_trace()
     driver = Remote(base_url + '/wd/hub', desired_capabilities=CAPABILITIES)
@@ -28,7 +28,8 @@ def main():
     links = driver.find_elements_by_xpath('//a')
     curr_link = links[1]
     outer_html = curr_link.get_attribute('outerHTML')
-
+    import pdb
+    pdb.set_trace()
     print('result:')
     print(outer_html)
 

@@ -1,4 +1,4 @@
-
+import os
 
 from main.main import sys_call
 
@@ -14,7 +14,12 @@ NODE_IP = '185.207.112.31'
 def setup_proxy_mode():
     sys_call('hyper rm -f seleniumproxy')
 
-    sys_call('hyper run -p 5000:5000 -d --name seleniumproxy eventjumbler/selenium-proxy')
+    sys_call('hyper run -p 5000:5000 -d --name seleniumproxy -e HYPERSH_ACCESS_KEY=%s -e HYPERSH_SECRET=%s -e HYPERSH_REGION=%s eventjumbler/selenium-proxy' %
+        (os.environ['HYPERSH_ACCESS_KEY'], os.environ['HYPERSH_SECRET'], os.environ['HYPERSH_REGION'])
+    )
+
+    # hyper run -p 5000:5000 -d --name seleniumproxy -e HYPERSH_ACCESS_KEY=$HYPERSH_ACCESS_KEY -e HYPERSH_SECRET=$HYPERSH_SECRET -e HYPERSH_REGION=$HYPERSH_REGION eventjumbler/selenium-proxy
+
     sys_call('hyper fip attach %s seleniumproxy' % PROXY_IP)
 
 

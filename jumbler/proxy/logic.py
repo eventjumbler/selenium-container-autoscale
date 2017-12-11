@@ -27,11 +27,10 @@ logger = logging.getLogger(__name__)
 # TODO: Deprecated
 
 
-def create_container(app_logic, container_name):
-    self = app_logic
-    return self.hyper_client.create_container(
+def create_node_container(app_logic, container_name):
+    return app_logic.hyper_client.create_container(
         NODE_IMAGE, container_name, size='M2',
-        environment_variables={'PROXY_CONTAINER': self.proxy_container},
+        environment_variables={'PROXY_CONTAINER': app_logic.proxy_container},
         tcp_ports=['4444', '5555']
     )
 
