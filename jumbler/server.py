@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+import sys
 from signal import SIGINT, signal
 
 import proxy.cmd_utils as cmd_utils
@@ -19,6 +20,15 @@ from sanic.response import text as text_resp
 _LOG = logging.getLogger(__name__)
 
 
+def _init_loop():
+    if sys.platform == "win32":
+        loop = asyncio.ProactorEventLoop()
+        asyncio.set_event_loop(loop)
+    else:
+        loop = asyncio.get_event_loop()
+    return loop
+
+
 class SanicServer():
     """
     Sanic server
@@ -33,7 +43,7 @@ class SanicServer():
         self.server_cfg = server_cfg
         self.sanic_app = Sanic(__name__, log_config=log_cfg)
         self.server = self.sanic_app.create_server(**server_cfg)
-        self.loop = asyncio.get_event_loop()
+        self.loop = _init_loop()
         self.app_logic = AppLogic(self.loop)
         self.business_logic = BusinessLogic(self.loop, business_cfg)
         self.__config()
@@ -43,13 +53,23 @@ class SanicServer():
         Entry point to startup server
         """
         _LOG.info('Starting sanic server...')
-        task = asyncio.ensure_future(self.server)
-        signal(SIGINT, lambda s, f: self.loop.stop())
+        asyncio.ensure_future(self.server)
+        # TODO: Handle to quit server then stop all slave containers
+        signal(SIGINT, lambda s, f: self.stop())
         try:
             self.loop.run_forever()
-        except Exception as ex:
+        except RuntimeError as ex:
             _LOG.exception(ex)
-            self.loop.stop()
+            self.stop()
+
+    def stop(self):
+        """
+        Entry point to stop server
+        """
+        asyncio.gather(*asyncio.Task.all_tasks()).cancel()
+        self.loop.stop()
+        self.loop.close()
+        sys.exit(0)
 
     def __config(self):
         self.sanic_app.config.REQUEST_TIMEOUT = 90
@@ -90,8 +110,7 @@ class SanicServer():
         return text_resp('success!')
 
     async def __query_driver(self, request, driver_url):
-        if '//' in driver_url:
-            driver_url = driver_url.replace('//', '/')
+        driver_url = self.__normalize_url(driver_url)
         request_type = self.__driver_request_type(driver_url, request.method)
         if request_type == self.NEW_DRIVER:
             # old: reuse_session = json.loads(body_str).get('reuse_session')
@@ -107,10 +126,9 @@ class SanicServer():
         return await self.app_logic.proxy_selenium_request(request, driver_url)
 
     async def __request_selenium_node(self, request, driver_url):
-        _LOG.info(driver_url)
+        _LOG.info('Request url %s', driver_url)
         _LOG.debug(request.json)
-        if '//' in driver_url:
-            driver_url = driver_url.replace('//', '/')
+        driver_url = self.__normalize_url(driver_url)
         if request.method == 'POST' and driver_url == 'session':
             return json_resp(await self.business_logic.start_selenium_node(request.json), status=200)
         status_code, resp = await self.business_logic.forward_request(request, driver_url)
@@ -133,3 +151,6 @@ class SanicServer():
         if isinstance(exception, ExecutionError) or isinstance(exception, BusinessError):
             raise ServerError(exception.message)
         raise ServerError(exception)
+
+    def __normalize_url(self, url):
+        return url.replace('//', '/') if '//' in url else url

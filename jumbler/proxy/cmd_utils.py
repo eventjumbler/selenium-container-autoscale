@@ -1,24 +1,28 @@
 import asyncio
 import logging
-from subprocess import Popen, PIPE
+import shlex
+from subprocess import PIPE, Popen
 
 import proxy.util as util
 
 _LOG = logging.getLogger(__name__)
 
 async def sys_call_async(command):
-    proc = await asyncio.create_subprocess_exec(*command.split(), stdout=PIPE, stderr=PIPE)
+    _LOG.debug(command)
+    _command = shlex.split(command)
+    proc = await asyncio.create_subprocess_exec(*_command, stdout=PIPE, stderr=PIPE)
     await proc.wait()
     stdout, stderr = await proc.communicate()
     success = proc.returncode == 0
     return success, stdout.decode(), stderr.decode()
 
 
-def sys_call(cmd_str, shell=False):
-    p = Popen(cmd_str.split(), stdout=PIPE, stderr=PIPE, stdin=PIPE, shell=shell, universal_newlines=True)
-    stdout, stderr = p.communicate()
-    success = p.returncode == 0
-    return success, stdout, stderr
+def sys_call(command, shell=True):
+    _LOG.debug(command)
+    proc = Popen(command, stdout=PIPE, stderr=PIPE, shell=shell, universal_newlines=True)
+    stdout, stderr = proc.communicate()
+    stdout, stderr = stdout if isinstance(stdout, str) else stdout.decode(), stderr if isinstance(stderr, str) else stderr.decode()
+    return proc.returncode == 0, stdout.strip(), stderr.strip()
 
 
 async def ping_wait(container_name, wait=9):

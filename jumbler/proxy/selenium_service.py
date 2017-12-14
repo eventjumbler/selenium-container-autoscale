@@ -82,7 +82,7 @@ class SeleniumService:
             raise RequestError('Failure communication with Selenium Hub in %s. Response: %s' % (url, response))
         return response
 
-    def create_node(self, hub_name, browser, selenium_node_id, image=None, tag=None):
+    def create_node_info(self, hub_name, browser, selenium_node_id, image=None, tag=None):
         '''
         Create new Docker container for Selenium Grid Node.\n
         If Docker image of Selenium Grid Node not found in current system, it will try to pull image firstly
@@ -138,7 +138,6 @@ class SeleniumService:
         resp_code, response = await rest_client.http_get(selenium_node_url)
         if resp_code != 200:
             raise RequestError('Failure communication with Selenium Node %s in %s. Response: %s' % (selenium_node_id, selenium_node_url, response))
-        # status = response['status']
         value = response.get('value')
         if value:
             return State.RUNNING

@@ -5,4 +5,4 @@ asynctest==0.10.1
 selenium==3.6.0
 aiohttp==2.2.5
 pyyaml==3.12
-git+https://github.com/zero-88/docker_rest.git@v0.1.0#egg=dockerrest-0.1.0
+git+https://github.com/zero-88/docker_rest.git@v0.1.1#egg=dockerrest-0.1.1

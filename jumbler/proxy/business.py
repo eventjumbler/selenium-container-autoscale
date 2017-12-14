@@ -24,7 +24,7 @@ class BusinessLogic(object):
         self.loop = asyncio_loop
         self.retry = business_cfg.get('retry')
         self.interval = business_cfg.get('interval')
-        self.docker_client = docker_provider.factory(business_cfg.get('mode'), endpoint=business_cfg.get('endpoint'))
+        self.docker_client = docker_provider.factory(business_cfg.get('mode'), loop=self.loop, endpoint=business_cfg.get('endpoint'))
         self.proxy_container_id = cmd_utils.get_host()
         self.proxy_container_ip = self.__get_docker_container_ip(self.proxy_container_id)
         self.selenium = SeleniumService(self.loop, self.retry, self.interval)
@@ -51,12 +51,12 @@ class BusinessLogic(object):
         if status in (State.NOT_AVAILABLE, State.RUNNING):
             # Create new selenium node with browser and generated id
             result['selenium_node_id'] = browser + '-' + util.uuid(10)
-            container_info = self.selenium.create_node(self.proxy_container_id, browser, result.get('selenium_node_id'))
+            container_info = self.selenium.create_node_info(self.proxy_container_id, browser, result.get('selenium_node_id'))
             if not self.docker_client.pull_image(container_info.get('image'), container_info.get('tag')):
                 raise RequestError('Cannot pull image %s', container_info.get('full_image'))
             status, result['container_id'] = self.docker_client.create_container(
                 container_info.get('full_image'), name=container_info.get('name'),
-                environment_variables=container_info.get('env'), links=container_info.get('links'))
+                env_vars=container_info.get('env'), links=container_info.get('links'))
             if not status:
                 raise RequestError('Cannot create container')
         elif status is State.OFF:
@@ -129,6 +129,13 @@ class BusinessLogic(object):
         await self.database.remove_node(node_ids)
 
     async def forward_request(self, request, driver_url):
+        '''
+        Forward request to Selenium Hub
+
+        :Args:
+        request: HTTP request
+        driver_url: Selenium Hub driver URL
+        '''
         url = self.selenium.generate_hub_url(self.proxy_container_ip, driver_url)
         if request.method == 'POST':
             return await rest_client.http_post(url, data=request.body)
