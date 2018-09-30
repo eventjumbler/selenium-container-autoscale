@@ -1,6 +1,6 @@
 # Selenium Container Autoscale
 
-This project provides an easy way to set up an autoscaling container-hosted selenium service. It works by proxying selenium's http (JSONWire)
+This project provides an easy way to set up an autoscaling container-hosted selenium service on hyper.sh. It works by proxying selenium's http (JSONWire)
 requests to containers that run browser instances, spinning up new containers dynamically, reusing browsers instances that have been
 released and shutting down idle containers.
 
